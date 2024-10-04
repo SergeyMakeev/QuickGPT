@@ -1,6 +1,8 @@
 import sys
 from openai import OpenAI
 import pyperclip
+import subprocess
+
 
 openai_api_key = ""
 if len(sys.argv) > 1:
@@ -89,26 +91,85 @@ def translate_to_en(text):
     return response.choices[0].message.content
 
 
+def generate_commit_message(changes):
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are an assistant that generates helpful and concise git commit messages. "
+                           "Here is the guideline to write a good commit message.\n"
+                           "A good commit message describes the following:\n"
+                           "- Commit message should start with a descriptive subject line (72 characters max)\n"
+                           "- Why is the change being made?\n"
+                           "- What is the summary of the changes being made?\n"
+                           "- What are the possible consequences of the change being made on the rest of the system?\n"
+                           "- If the change is performance or memory related, what is the summary of expected impact?\n"
+                           "- If the change changes API, what is the expected user-observed behavior if any?\n"
+                           "Basically think about this this way. "
+                           "Five years later, somebody will hit a problem and trace it to your change. "
+                           "They will want to understand more about the change but you may not remember the details or "
+                           "may not work at the company. "
+                           "What's more, there is no guarantee that the JIRA ticket linked would contain any "
+                           "actionable info - it definitely would not contain some of the details mentioned!",
+            },
+            {
+                "role": "user",
+                "content": f"Generate a good commit message for the following changes\n\n{changes}",
+            },
+        ],
+        max_tokens=500,  # Adjust as needed
+        temperature=0.5,
+    )
+    return response.choices[0].message.content.strip()
+
+
+def get_git_diff():
+    result = subprocess.run(
+        ["git", "diff", "--staged"], stdout=subprocess.PIPE, text=True
+    )
+    return result.stdout
+
+
+def generate_good_commit_message():
+    print("Thinking -----< Generate Commit Message >-----")
+    changes = get_git_diff()
+
+    if not changes:
+        print("No staged changes found.")
+        return
+
+    return generate_commit_message(changes)
+
+
 def main():
     clipboard_text = pyperclip.paste()
     print("Input text ------------------------------")
     print(clipboard_text)
 
-    choice = input("\n\nContinue?\nY/n and press Enter: ").strip().lower()
-    if choice != 'y':
-        print("Done")
-        return
+    choice = input("\n\nWhat to do?\n"
+                   "1.Fix grammar\n"
+                   "2.Translate to RU\n"
+                   "3.Translate to EN\n"
+                   "4.Generate auto-commit message (run this script directly from repo)\n").strip().lower()
 
-    answer = fix_grammar(clipboard_text)
-    print(answer)
-
-    answer = translate_to_ru(answer)
-    print(answer)
-
-    answer = translate_to_en(answer)
-    print(answer)
-
-    print("Done")
+    if choice == '1':
+        answer = fix_grammar(clipboard_text)
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == '2':
+        answer = translate_to_ru(clipboard_text)
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == '3':
+        answer = translate_to_en(clipboard_text)
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == '4':
+        answer = generate_good_commit_message()
+        print(answer)
+        pyperclip.copy(answer)
+    print("\nBye!")
 
 
 main()
