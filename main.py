@@ -91,6 +91,30 @@ def translate_to_en(text):
     return response.choices[0].message.content
 
 
+def reply_to_email(text):
+    print("Thinking -----< Replying to email >-----")
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are an assistant that replies to emails on behalf of Sergei Makeev"
+                           "You will be provided with an email text and "
+                           "you need to write a clear, and polite answer to that email. "
+                           "Provide a new corrected text as an answer without any additional ideas or comments. "
+                           "No further explanation needed."
+            },
+            {
+                "role": "user",
+                "content": text
+            },
+        ],
+        max_tokens=500,
+        temperature=0.5,
+    )
+    return response.choices[0].message.content.strip()
+
+
 def generate_commit_message(changes):
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -152,6 +176,7 @@ def main():
                    "2.Translate to RU\n"
                    "3.Translate to EN\n"
                    "4.Generate auto-commit message (run this script directly from repo)\n"
+                   "5.Reply to the email\n"
                    "\n"
                    "0.Exit\n").strip().lower()
 
@@ -169,6 +194,10 @@ def main():
         pyperclip.copy(answer)
     elif choice == '4':
         answer = generate_good_commit_message()
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == '5':
+        answer = reply_to_email(clipboard_text)
         print(answer)
         pyperclip.copy(answer)
     print("\nBye!")
