@@ -151,7 +151,9 @@ def main():
                    "1.Fix grammar\n"
                    "2.Translate to RU\n"
                    "3.Translate to EN\n"
-                   "4.Generate auto-commit message (run this script directly from repo)\n").strip().lower()
+                   "4.Generate auto-commit message (run this script directly from repo)\n"
+                   "\n"
+                   "0.Exit\n").strip().lower()
 
     if choice == '1':
         answer = fix_grammar(clipboard_text)
