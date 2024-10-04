@@ -17,8 +17,24 @@ client = OpenAI(
   api_key = openai_api_key
 )
 
+
 # models = client.models.list()
 # print(models)
+def run_raw_prompt(prompt):
+    print("Thinking -----< raw prompt >-----")
+    response = client.chat.completions.create(
+      model="gpt-4o-mini",
+      messages=[
+        {
+          "role": "user",
+          "content": prompt
+        }
+      ],
+      temperature=0.7,
+      max_tokens=1024,
+      top_p=1
+    )
+    return response.choices[0].message.content
 
 
 def fix_grammar(text):
@@ -212,6 +228,7 @@ def main():
                    "3.Translate to EN\n"
                    "4.Generate auto-commit message. {" + dir_path + "}\n"
                    "5.Reply to the email\n"
+                   "6.Run raw prompt\n"
                    "\n"
                    "0.Exit\n").strip().lower()
 
@@ -233,6 +250,10 @@ def main():
         pyperclip.copy(answer)
     elif choice == '5':
         answer = reply_to_email(clipboard_text)
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == '6':
+        answer = run_raw_prompt(clipboard_text)
         print(answer)
         pyperclip.copy(answer)
     print("\nBye!")
