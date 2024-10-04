@@ -1,3 +1,4 @@
+import os
 import sys
 from openai import OpenAI
 import pyperclip
@@ -148,16 +149,34 @@ def generate_commit_message(changes):
     return response.choices[0].message.content.strip()
 
 
-def get_git_diff():
+def get_git_diff(working_dir):
+
+    if not os.path.isdir(working_dir):
+        print(f"Working dir '{working_dir}' does not exist")
+        return None
+
+    original_dir = os.getcwd()
+    os.chdir(working_dir)
+
     result = subprocess.run(
-        ["git", "diff", "--staged"], stdout=subprocess.PIPE, text=True
+        ["git", "diff", "--staged"],
+        # cwd=working_dir,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
     )
+
+    if result.returncode != 0:
+        print(f"Command failed with return code {result.returncode}")
+        print(result.stderr)
+
+    os.chdir(original_dir)
     return result.stdout
 
 
-def generate_good_commit_message():
+def generate_good_commit_message(git_repo_dir):
     print("Thinking -----< Generate Commit Message >-----")
-    changes = get_git_diff()
+    changes = get_git_diff(git_repo_dir)
 
     if not changes:
         print("No staged changes found.")
@@ -166,16 +185,32 @@ def generate_good_commit_message():
     return generate_commit_message(changes)
 
 
+def is_directory_path(path: str) -> bool:
+    return os.path.isdir(path)
+
+
+def return_directory_path_or_fallback(input_text, fallback):
+    if len(input_text) > 250:
+        return fallback
+
+    if is_directory_path(input_text):
+        return input_text
+    else:
+        return fallback
+
+
 def main():
     clipboard_text = pyperclip.paste()
     print("Input text ------------------------------")
     print(clipboard_text)
 
+    dir_path = return_directory_path_or_fallback(clipboard_text, ".")
+
     choice = input("\n\nWhat to do?\n"
                    "1.Fix grammar\n"
                    "2.Translate to RU\n"
                    "3.Translate to EN\n"
-                   "4.Generate auto-commit message (run this script directly from repo)\n"
+                   "4.Generate auto-commit message. {" + dir_path + "}\n"
                    "5.Reply to the email\n"
                    "\n"
                    "0.Exit\n").strip().lower()
@@ -193,7 +228,7 @@ def main():
         print(answer)
         pyperclip.copy(answer)
     elif choice == '4':
-        answer = generate_good_commit_message()
+        answer = generate_good_commit_message(dir_path)
         print(answer)
         pyperclip.copy(answer)
     elif choice == '5':
