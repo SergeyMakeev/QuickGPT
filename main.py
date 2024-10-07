@@ -132,6 +132,49 @@ def reply_to_email(text):
     return response.choices[0].message.content.strip()
 
 
+def fix_commit_message(text):
+    print("Thinking -----< Fix Commit Message >-----")
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are an assistant that generates helpful and concise git commit messages. "
+                           "Here is the guideline to write a good commit message.\n"
+                           "A good commit message describes the following:\n"
+                           "- Commit message should start with a descriptive subject line (72 characters max)\n"
+                           "- Why is the change being made?\n"
+                           "- What is the summary of the changes being made?\n"
+                           "- What are the possible consequences of the change being made on the rest of the system?\n"
+                           "- If the change is performance or memory related, what is the summary of expected impact?\n"
+                           "- If the change changes API, what is the expected user-observed behavior if any?\n"
+                           "Basically think about this this way. "
+                           "Five years later, somebody will hit a problem and trace it to your change. "
+                           "They will want to understand more about the change but you may not remember the details or "
+                           "may not work at the company. "
+                           "What's more, there is no guarantee that the JIRA ticket linked would contain any "
+                           "actionable info - it definitely would not contain some of the details mentioned!\n"
+                           "Please always use active voice, and preferably just imperative.\n"
+                           "Here are a few examples:\n"
+                           "Bad\n"
+                           "'The code was fixed to avoid a NULL pointer dereference'\n"
+                           "OK(ish)\n"
+                           "'This fixes a NULL pointer dereference'\n"
+                           "Good (Preferable)\n"
+                           "'Fix NULL pointer dereference'\n",
+            },
+            {
+                "role": "user",
+                "content": f"Rewrite the provided commit message to conform "
+                           f"to the commit message guidelines.\n\n{text}",
+            },
+        ],
+        max_tokens=500,  # Adjust as needed
+        temperature=0.5,
+    )
+    return response.choices[0].message.content.strip()
+
+
 def generate_commit_message(changes):
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -152,7 +195,15 @@ def generate_commit_message(changes):
                            "They will want to understand more about the change but you may not remember the details or "
                            "may not work at the company. "
                            "What's more, there is no guarantee that the JIRA ticket linked would contain any "
-                           "actionable info - it definitely would not contain some of the details mentioned!",
+                           "actionable info - it definitely would not contain some of the details mentioned!\n"
+                           "Please always use active voice, and preferably just imperative.\n"
+                           "Here are a few examples:\n"
+                           "Bad\n"
+                           "'The code was fixed to avoid a NULL pointer dereference'\n"
+                           "OK(ish)\n"
+                           "'This fixes a NULL pointer dereference'\n"
+                           "Good (Preferable)\n"
+                           "'Fix NULL pointer dereference'\n",
             },
             {
                 "role": "user",
@@ -226,9 +277,10 @@ def main():
                    "1.Fix grammar\n"
                    "2.Translate to RU\n"
                    "3.Translate to EN\n"
-                   "4.Generate auto-commit message. {" + dir_path + "}\n"
-                   "5.Reply to the email\n"
-                   "6.Run raw prompt\n"
+                   "4.Generate auto-commit message {" + dir_path + "}\n"
+                   "5.Fix commit message\n"
+                   "6.Reply to the email\n"
+                   "7.Run raw prompt\n"
                    "\n"
                    "0.Exit\n").strip().lower()
 
@@ -249,10 +301,14 @@ def main():
         print(answer)
         pyperclip.copy(answer)
     elif choice == '5':
-        answer = reply_to_email(clipboard_text)
+        answer = fix_commit_message(clipboard_text)
         print(answer)
         pyperclip.copy(answer)
     elif choice == '6':
+        answer = reply_to_email(clipboard_text)
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == '7':
         answer = run_raw_prompt(clipboard_text)
         print(answer)
         pyperclip.copy(answer)
