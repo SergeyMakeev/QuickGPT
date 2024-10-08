@@ -108,6 +108,23 @@ def translate_to_en(text):
     return response.choices[0].message.content
 
 
+def summarize(text):
+    print("Thinking -----< Summarizing >-----")
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "user",
+                "content": f"Summarize the following text.\n\n{text}",
+
+            },
+        ],
+        max_tokens=500,
+        temperature=0.5,
+    )
+    return response.choices[0].message.content.strip()
+
+
 def reply_to_email(text):
     print("Thinking -----< Replying to email >-----")
     response = client.chat.completions.create(
@@ -280,7 +297,8 @@ def main():
                    "4.Generate auto-commit message {" + dir_path + "}\n"
                    "5.Fix commit message\n"
                    "6.Reply to the email\n"
-                   "7.Run raw prompt\n"
+                   "7.Summarize\n"
+                   "8.Run raw prompt\n"
                    "\n"
                    "0.Exit\n").strip().lower()
 
@@ -309,6 +327,10 @@ def main():
         print(answer)
         pyperclip.copy(answer)
     elif choice == '7':
+        answer = summarize(clipboard_text)
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == '8':
         answer = run_raw_prompt(clipboard_text)
         print(answer)
         pyperclip.copy(answer)
