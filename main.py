@@ -108,11 +108,40 @@ def translate_to_en(text):
     return response.choices[0].message.content
 
 
+def explain(text):
+    print("Thinking -----< Explaining >-----")
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are an assistant who explains things using simple language. "
+                           "You will be provided with a text, and you need to explain what is written in that text." 
+                           "Consider that the explanation should be in simple English and "
+                           "assume that the reader is a software engineer familiar with basic math, physics, etc."
+            },
+            {
+                "role": "user",
+                "content": f"Explain the following.\n\n{text}",
+            },
+        ],
+        max_tokens=500,
+        temperature=0.5,
+    )
+    return response.choices[0].message.content.strip()
+
+
 def summarize(text):
     print("Thinking -----< Summarizing >-----")
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
+            {
+                "role": "system",
+                "content": "You are an assistant that summarizes long texts. "
+                           "You will be provided with a text, and you need to write a clear "
+                           "yet comprehensive summary of that text."
+            },
             {
                 "role": "user",
                 "content": f"Summarize the following text.\n\n{text}",
@@ -125,22 +154,22 @@ def summarize(text):
     return response.choices[0].message.content.strip()
 
 
-def reply_to_email(text):
+def reply_to_email(text, rough_answer):
     print("Thinking -----< Replying to email >-----")
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
-                "content": "You are an assistant that replies to emails on behalf of Sergei Makeev"
-                           "You will be provided with an email text and "
-                           "you need to write a clear, and polite answer to that email. "
+                "content": "You are an assistant that replies to emails on behalf of Sergei Makeev. "
+                           "You will be provided with an email text and very draft response. "
+                           "Given provided draft response you need to write a clear, and polite answer to that email. "
                            "Provide a new corrected text as an answer without any additional ideas or comments. "
                            "No further explanation needed."
             },
             {
                 "role": "user",
-                "content": text
+                "content": f"Source email\n\n{text}\n\nDraft response\n\n{rough_answer}",
             },
         ],
         max_tokens=500,
@@ -290,15 +319,16 @@ def main():
 
     dir_path = return_directory_path_or_fallback(clipboard_text, ".")
 
-    choice = input("\n\nWhat to do?\n"
+    choice = input("\n\nQ: What to do?\n"
                    "1.Fix grammar\n"
                    "2.Translate to RU\n"
                    "3.Translate to EN\n"
                    "4.Generate auto-commit message {" + dir_path + "}\n"
                    "5.Fix commit message\n"
-                   "6.Reply to the email\n"
+                   "6.Reply to the email...\n"
                    "7.Summarize\n"
-                   "8.Run raw prompt\n"
+                   "8.Explain\n"
+                   "9.Run clipboard as a raw prompt\n"
                    "\n"
                    "0.Exit\n").strip().lower()
 
@@ -323,7 +353,8 @@ def main():
         print(answer)
         pyperclip.copy(answer)
     elif choice == '6':
-        answer = reply_to_email(clipboard_text)
+        rough_answer = input("Q: What would you like me to reply?\n\n")
+        answer = reply_to_email(clipboard_text, rough_answer)
         print(answer)
         pyperclip.copy(answer)
     elif choice == '7':
@@ -331,6 +362,10 @@ def main():
         print(answer)
         pyperclip.copy(answer)
     elif choice == '8':
+        answer = explain(clipboard_text)
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == '9':
         answer = run_raw_prompt(clipboard_text)
         print(answer)
         pyperclip.copy(answer)
