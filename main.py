@@ -47,7 +47,6 @@ def fix_grammar(text):
           "content": "You will be provided with statements; your task is to convert them to standard English, "
                      "fix the grammar, and make them sound like a native US speaker. "
                      "Keep it simple and make it sound like a software engineer. "
-                     "Split sentences using a new line instead of using a period this will make it look more natural. "
                      "If you see something marked with tilde that's a code snippet, do not change it and "
                      "keep opening and closing tildes. "
                      "Try to keep the original style if possible. "
