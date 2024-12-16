@@ -111,6 +111,28 @@ def translate_to_en(text):
     return response.choices[0].message.content
 
 
+def structure_braindump(text):
+    print("Thinking -----< Structurizing >-----")
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            dict(role="system",
+                 content="You are an assistant who structure notes and brain dumps using simple English. "
+                         "You will be provided with an unstructured text, and you need to structure and summarize it."
+                         " Find common topics and put them into a separate paragraphs. Add a paragraph with summary "
+                         "in the end. "
+                         "Assume that the reader is a software engineer familiar with basic math, physics, etc."),
+            {
+                "role": "user",
+                "content": f"Explain the following.\n\n{text}",
+            },
+        ],
+        max_tokens=2500,
+        temperature=0.5,
+    )
+    return response.choices[0].message.content.strip()
+
+
 def explain(text):
     print("Thinking -----< Explaining >-----")
     response = client.chat.completions.create(
@@ -331,7 +353,9 @@ def main():
                    "6.Reply to the email...\n"
                    "7.Summarize\n"
                    "8.Explain\n"
-                   "9.Run clipboard as a raw prompt\n"
+                   "9.Structure (structure a braindump)\n"
+                   "Z.Run clipboard as a raw prompt\n"
+                   "X.Type raw prompt...\n"
                    "\n"
                    "0.Exit\n").strip().lower()
 
@@ -369,7 +393,16 @@ def main():
         print(answer)
         pyperclip.copy(answer)
     elif choice == '9':
+        answer = structure_braindump(clipboard_text)
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == 'Z' or choice == 'z':
         answer = run_raw_prompt(clipboard_text)
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == 'X' or choice == 'x':
+        user_raw_prompt = input("Q: Type your prompt here\n\n")
+        answer = run_raw_prompt(user_raw_prompt)
         print(answer)
         pyperclip.copy(answer)
     print("\nBye!")
