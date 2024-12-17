@@ -301,7 +301,8 @@ def get_git_diff(working_dir):
         # cwd=working_dir,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True
+        text=True,
+        encoding='utf-8'
     )
 
     if result.returncode != 0:
