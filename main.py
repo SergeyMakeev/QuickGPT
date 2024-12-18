@@ -1,9 +1,9 @@
 import os
 import sys
 from openai import OpenAI
+import anthropic
 import pyperclip
 import subprocess
-
 
 openai_api_key = ""
 if len(sys.argv) > 1:
@@ -14,16 +14,91 @@ else:
     exit(-1)
 
 client = OpenAI(
-  api_key = openai_api_key
+  api_key=openai_api_key
 )
 
 
+anthropic_api_key = ""
+claude_client = None
+if len(sys.argv) > 2:
+    param = sys.argv[2]
+    anthropic_api_key = str(param)
+    claude_client = anthropic.Anthropic(api_key=anthropic_api_key)
+    # print("Anthropic models")
+    # models = claude_client.models.list()
+    # print(models)
+
+# print("OpenAI models")
 # models = client.models.list()
 # print(models)
+
+anthropic_model = "claude-3-5-sonnet-20241022"
+openai_model = "chatgpt-4o-latest"
+
+
+def run_raw_prompt_claude(prompt):
+    print("Thinking -----< raw prompt >-----")
+    if not claude_client:
+        print("No Anthropic API key was provided")
+        return
+
+    message = claude_client.messages.create(
+        model=anthropic_model,
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    )
+    return message.content[0].text
+
+
+def generate_commit_message_claude(changes):
+    message = claude_client.messages.create(
+        model=anthropic_model,
+        max_tokens=5000,
+        messages=[
+            {
+                "role": "user",
+                "content": "You are an assistant that generates helpful and concise git commit messages. "
+                           "Here is the guideline to write a good commit message.\n"
+                           "A good commit message describes the following:\n"
+                           "- Commit message should start with a descriptive subject line (72 characters max)\n"
+                           "- Why is the change being made?\n"
+                           "- What is the summary of the changes being made?\n"
+                           "- What are the possible consequences of the change being made on the rest of the system?\n"
+                           "- If the change is performance or memory related, what is the summary of expected impact?\n"
+                           "- If the change changes API, what is the expected user-observed behavior if any?\n"
+                           "Basically think about this this way. "
+                           "Five years later, somebody will hit a problem and trace it to your change. "
+                           "They will want to understand more about the change but you may not remember the details or "
+                           "may not work at the company. "
+                           "What's more, there is no guarantee that the JIRA ticket linked would contain any "
+                           "actionable info - it definitely would not contain some of the details mentioned!\n"
+                           "Please always use active voice, and preferably just imperative.\n"
+                           "Here are a few examples:\n"
+                           "Bad\n"
+                           "'The code was fixed to avoid a NULL pointer dereference'\n"
+                           "OK(ish)\n"
+                           "'This fixes a NULL pointer dereference'\n"
+                           "Good (Preferable)\n"
+                           "'Fix NULL pointer dereference'\n",
+            },
+            {
+                "role": "user",
+                "content": f"Generate a good commit message for the following changes\n\n{changes}",
+            }
+        ]
+    )
+    return message.content[0].text.strip()
+
+
 def run_raw_prompt(prompt):
     print("Thinking -----< raw prompt >-----")
     response = client.chat.completions.create(
-      model="gpt-4o-mini",
+      model=openai_model,
       messages=[
         {
           "role": "user",
@@ -40,7 +115,7 @@ def run_raw_prompt(prompt):
 def fix_grammar(text):
     print("Thinking -----< fix grammar >-----")
     response = client.chat.completions.create(
-      model="gpt-4o-mini",
+      model=openai_model,
       messages=[
         {
           "role": "system",
@@ -68,7 +143,7 @@ def fix_grammar(text):
 def translate_to_ru(text):
     print("Thinking -----< translate to RU >-----")
     response = client.chat.completions.create(
-      model="gpt-4o-mini",
+      model=openai_model,
       messages=[
         {
           "role": "system",
@@ -91,7 +166,7 @@ def translate_to_ru(text):
 def translate_to_en(text):
     print("Thinking -----< translate to EN >-----")
     response = client.chat.completions.create(
-      model="gpt-4o-mini",
+      model=openai_model,
       messages=[
         {
           "role": "system",
@@ -114,7 +189,7 @@ def translate_to_en(text):
 def structure_braindump(text):
     print("Thinking -----< Structurizing >-----")
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=openai_model,
         messages=[
             dict(role="system",
                  content="You are an assistant who structure notes and brain dumps using simple English. "
@@ -136,7 +211,7 @@ def structure_braindump(text):
 def explain(text):
     print("Thinking -----< Explaining >-----")
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=openai_model,
         messages=[
             {
                 "role": "system",
@@ -159,7 +234,7 @@ def explain(text):
 def summarize(text):
     print("Thinking -----< Summarizing >-----")
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=openai_model,
         messages=[
             {
                 "role": "system",
@@ -182,7 +257,7 @@ def summarize(text):
 def reply_to_email(text, rough_answer):
     print("Thinking -----< Replying to email >-----")
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=openai_model,
         messages=[
             {
                 "role": "system",
@@ -206,7 +281,7 @@ def reply_to_email(text, rough_answer):
 def fix_commit_message(text):
     print("Thinking -----< Fix Commit Message >-----")
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=openai_model,
         messages=[
             {
                 "role": "system",
@@ -248,7 +323,7 @@ def fix_commit_message(text):
 
 def generate_commit_message(changes):
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=openai_model,
         messages=[
             {
                 "role": "system",
@@ -281,7 +356,7 @@ def generate_commit_message(changes):
                 "content": f"Generate a good commit message for the following changes\n\n{changes}",
             },
         ],
-        max_tokens=500,  # Adjust as needed
+        max_tokens=5000,  # Adjust as needed
         temperature=0.5,
     )
     return response.choices[0].message.content.strip()
@@ -311,6 +386,17 @@ def get_git_diff(working_dir):
 
     os.chdir(original_dir)
     return result.stdout
+
+
+def generate_good_commit_message_claude(git_repo_dir):
+    print("Thinking -----< Generate Commit Message >-----")
+    changes = get_git_diff(git_repo_dir)
+
+    if not changes:
+        print("No staged changes found.")
+        return
+
+    return generate_commit_message_claude(changes)
 
 
 def generate_good_commit_message(git_repo_dir):
@@ -357,6 +443,8 @@ def main():
                    "9.Structure (structure a braindump)\n"
                    "Z.Run clipboard as a raw prompt\n"
                    "X.Type raw prompt...\n"
+                   "C.Type raw prompt (Claude AI) ...\n"
+                   "M.Generate auto-commit message  (Claude AI) {" + dir_path + "}\n"
                    "\n"
                    "0.Exit\n").strip().lower()
 
@@ -404,6 +492,15 @@ def main():
     elif choice == 'X' or choice == 'x':
         user_raw_prompt = input("Q: Type your prompt here\n\n")
         answer = run_raw_prompt(user_raw_prompt)
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == 'C' or choice == 'c':
+        user_raw_prompt = input("Q: Type your prompt here\n\n")
+        answer = run_raw_prompt_claude(user_raw_prompt)
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == 'M' or choice == 'm':
+        answer = generate_good_commit_message_claude(dir_path)
         print(answer)
         pyperclip.copy(answer)
     print("\nBye!")
