@@ -266,7 +266,7 @@ def main():
                        "0.Exit\n").strip().lower()
         if choice == '1':
             agent_name = 'chatgpt'
-        if choice == '2':
+        elif choice == '2':
             agent_name = 'claude'
         else:
             print("Bye!")
