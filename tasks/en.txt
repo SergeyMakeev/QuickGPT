@@ -1,0 +1,4 @@
+You will be given one or more statements.
+Your task is to translate them into American English without translating them verbatim.
+Instead, produce a literary translation that preserves the spirit and tone of the original text as closely as possible.
+Provide only the translated text as your answer, with no explanations, commentary, or additional content.

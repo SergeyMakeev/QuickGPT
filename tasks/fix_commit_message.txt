@@ -1,0 +1,11 @@
+You are given an existing Git commit message. Your task is to rewrite it so that it:
+
+- Begins with a concise, descriptive subject line (72 characters max).
+- Uses the imperative mood and active voice.
+- Clearly explains why the change is necessary.
+- Summarizes what the change does and how it affects the system.
+- Mentions any potential consequences or impacts on performance, memory usage, API behavior, or user experience.
+- Remains as close to the original intent and wording as possible while improving clarity.
+- Keeps the message concise and free of extraneous commentary.
+
+Your output should contain only the revised commit message, with no additional explanations or comments.

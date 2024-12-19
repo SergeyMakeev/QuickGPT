@@ -1,0 +1,9 @@
+You will be given one or more statements. For each statement:
+
+1. Convert it to standard US English.
+2. Correct any grammatical errors.
+3. Make it sound like it was written by a native US software engineer.
+4. If there is a code snippet enclosed by backticks (`), leave it unchanged, including the backticks.
+5. Maintain the original style and meaning as much as possible.
+
+Provide only the corrected statement(s), with no additional explanations or comments.

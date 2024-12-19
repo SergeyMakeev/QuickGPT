@@ -1,0 +1,11 @@
+You are given a Git diff as input. Your task is to craft a single commit message that clearly communicates the purpose, nature, and potential impact of the changes.
+
+Follow these guidelines:
+- Begin with a concise, descriptive subject line (72 characters max).
+- Use the imperative mood and active voice.
+- Clearly describe why the change is being made.
+- Summarize what the change does and how it affects the system.
+- Mention any potential consequences or expected impact on performance, memory usage, API behavior, or user experience.
+- Keep the message clear and to the point, with no extraneous commentary.
+
+Your output should contain only the commit message, nothing else.

@@ -49,6 +49,40 @@ def read_text_file(file_path):
         print(f"An error occurred: {e}")
 
 
+def do_chatgpt(context: str, input_text: str, max_tokens: int, input_text2=None):
+    messages = [
+       {
+           "role": "system",
+           "content": context
+       },
+       {
+           "role": "user",
+           "content": input_text
+       }
+    ]
+
+    if input_text2 is not None:
+        messages.append({
+           "role": "user",
+           "content": input_text2
+        })
+
+    response = client.chat.completions.create(
+      model=openai_model,
+      messages=messages,
+      temperature=0.7,
+      max_tokens=max_tokens,
+      top_p=1
+    )
+    return response.choices[0].message.content
+
+
+def run_chatgpt_task(task_name: str, text: str, max_tokens: int, input_text2=None):
+    task_context = read_text_file("./tasks/" + task_name)
+    print("Thinking -----< " + task_name + " >-----")
+    return do_chatgpt(task_context, text, max_tokens, input_text2)
+
+
 def run_raw_prompt_claude(prompt):
     print("Thinking -----< raw prompt >-----")
     if not claude_client:
@@ -125,100 +159,8 @@ def run_raw_prompt(prompt):
     return response.choices[0].message.content
 
 
-def fix_grammar(text):
-    print("Thinking -----< fix grammar >-----")
-    response = client.chat.completions.create(
-      model=openai_model,
-      messages=[
-        {
-          "role": "system",
-          "content": "You will be provided with statements; your task is to convert them to standard English, "
-                     "fix the grammar, and make them sound like a native US speaker. "
-                     "Keep it simple and make it sound like a software engineer. "
-                     "If you see something marked with tilde that's a code snippet, do not change it and "
-                     "keep opening and closing tildes. "
-                     "Try to keep the original style if possible. "
-                     "Provide a new corrected text as an answer without any additional ideas or comments. "
-                     "No further explanation needed."
-        },
-        {
-          "role": "user",
-          "content": text
-        }
-      ],
-      temperature=0.7,
-      max_tokens=256,
-      top_p=1
-    )
-    return response.choices[0].message.content
-
-
-def translate_to_ru(text):
-    print("Thinking -----< translate to RU >-----")
-    response = client.chat.completions.create(
-      model=openai_model,
-      messages=[
-        {
-          "role": "system",
-          "content": "You will be provided with statements; your task is to translate that text to Russian. "
-                     "Provide a new corrected text as an answer without any additional ideas or comments. "
-                     "No further explanation needed."
-        },
-        {
-          "role": "user",
-          "content": text
-        }
-      ],
-      temperature=0.7,
-      max_tokens=256,
-      top_p=1
-    )
-    return response.choices[0].message.content
-
-
-def translate_to_en(text):
-    print("Thinking -----< translate to EN >-----")
-    response = client.chat.completions.create(
-      model=openai_model,
-      messages=[
-        {
-          "role": "system",
-          "content": "You will be provided with statements; your task is to translate that text to US English. "
-                     "Provide a new corrected text as an answer without any additional ideas or comments. "
-                     "No further explanation needed."
-        },
-        {
-          "role": "user",
-          "content": text
-        }
-      ],
-      temperature=0.7,
-      max_tokens=256,
-      top_p=1
-    )
-    return response.choices[0].message.content
-
-
-def structure_braindump(text):
-    print("Thinking -----< Structurizing >-----")
-    response = client.chat.completions.create(
-        model=openai_model,
-        messages=[
-            dict(role="system",
-                 content="You are an assistant who structure notes and brain dumps using simple English. "
-                         "You will be provided with an unstructured text, and you need to structure and summarize it."
-                         " Find common topics and put them into a separate paragraphs. Add a paragraph with summary "
-                         "in the end. "
-                         "Assume that the reader is a software engineer familiar with basic math, physics, etc."),
-            {
-                "role": "user",
-                "content": f"Explain the following.\n\n{text}",
-            },
-        ],
-        max_tokens=2500,
-        temperature=0.5,
-    )
-    return response.choices[0].message.content.strip()
+def fix_grammar_2_0(text):
+    return
 
 
 def explain(text):
@@ -236,29 +178,6 @@ def explain(text):
             {
                 "role": "user",
                 "content": f"Explain the following.\n\n{text}",
-            },
-        ],
-        max_tokens=500,
-        temperature=0.5,
-    )
-    return response.choices[0].message.content.strip()
-
-
-def summarize(text):
-    print("Thinking -----< Summarizing >-----")
-    response = client.chat.completions.create(
-        model=openai_model,
-        messages=[
-            {
-                "role": "system",
-                "content": "You are an assistant that summarizes long texts. "
-                           "You will be provided with a text, and you need to write a clear "
-                           "yet comprehensive summary of that text."
-            },
-            {
-                "role": "user",
-                "content": f"Summarize the following text.\n\n{text}",
-
             },
         ],
         max_tokens=500,
@@ -484,36 +403,41 @@ def main():
                    "Y.Ask expert (cpp)\n"
                    "U.Ask expert (manager)\n"
                    "I.Ask expert (entrepreneur)\n"
+                   "O.Fix grammar 2.0 (Debate ChatGPT + Claude AI)\n"
                    "\n"
                    "0.Exit\n").strip().lower()
 
     if choice == '1':
-        answer = fix_grammar(clipboard_text)
+        answer = run_chatgpt_task("grammar.txt", clipboard_text, 1024)
         print(answer)
         pyperclip.copy(answer)
     elif choice == '2':
-        answer = translate_to_ru(clipboard_text)
+        answer = run_chatgpt_task("ru.txt", clipboard_text, 1024)
         print(answer)
         pyperclip.copy(answer)
     elif choice == '3':
-        answer = translate_to_en(clipboard_text)
+        answer = run_chatgpt_task("en.txt", clipboard_text, 1024)
         print(answer)
         pyperclip.copy(answer)
     elif choice == '4':
-        answer = generate_good_commit_message(dir_path)
-        print(answer)
-        pyperclip.copy(answer)
+        staged_changes = get_git_diff(dir_path)
+        if not staged_changes:
+            print("No staged changes found.")
+        else:
+            answer = run_chatgpt_task("commit_message.txt", staged_changes, 16384)
+            print(answer)
+            pyperclip.copy(answer)
     elif choice == '5':
-        answer = fix_commit_message(clipboard_text)
+        answer = run_chatgpt_task("fix_commit_message.txt", clipboard_text, 1024)
         print(answer)
         pyperclip.copy(answer)
     elif choice == '6':
-        rough_answer = input("Q: What would you like me to reply?\n\n")
-        answer = reply_to_email(clipboard_text, rough_answer)
+        draft_answer = input("Q: What would you like me to reply?\n\n")
+        answer = run_chatgpt_task("email_reply.txt", clipboard_text, 1024, draft_answer)
         print(answer)
         pyperclip.copy(answer)
     elif choice == '7':
-        answer = summarize(clipboard_text)
+        answer = run_chatgpt_task("summarize.txt", clipboard_text, 16384)
         print(answer)
         pyperclip.copy(answer)
     elif choice == '8':
@@ -521,7 +445,7 @@ def main():
         print(answer)
         pyperclip.copy(answer)
     elif choice == '9':
-        answer = structure_braindump(clipboard_text)
+        answer = run_chatgpt_task("braindump.txt", clipboard_text, 16384)
         print(answer)
         pyperclip.copy(answer)
     elif choice == 'Q' or choice == 'q':
@@ -556,6 +480,10 @@ def main():
         pyperclip.copy(answer)
     elif choice == 'I' or choice == 'i':
         answer = ask_expert(clipboard_text, "entrepreneur.txt")
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == 'O' or choice == 'o':
+        answer = run_chatgpt_task("grammar.txt", clipboard_text, 1024)
         print(answer)
         pyperclip.copy(answer)
     print("\nBye!")
