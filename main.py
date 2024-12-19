@@ -482,6 +482,8 @@ def main():
                    "R.Generate auto-commit message  (Claude AI) {" + dir_path + "}\n"
                    "T.Ask expert (rendering)\n"
                    "Y.Ask expert (cpp)\n"
+                   "U.Ask expert (manager)\n"
+                   "I.Ask expert (entrepreneur)\n"
                    "\n"
                    "0.Exit\n").strip().lower()
 
@@ -546,6 +548,14 @@ def main():
         pyperclip.copy(answer)
     elif choice == 'Y' or choice == 'y':
         answer = ask_expert(clipboard_text, "cpp.txt")
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == 'U' or choice == 'u':
+        answer = ask_expert(clipboard_text, "manager.txt")
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == 'I' or choice == 'i':
+        answer = ask_expert(clipboard_text, "entrepreneur.txt")
         print(answer)
         pyperclip.copy(answer)
     print("\nBye!")
