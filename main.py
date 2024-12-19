@@ -36,6 +36,19 @@ anthropic_model = "claude-3-5-sonnet-20241022"
 openai_model = "chatgpt-4o-latest"
 
 
+def read_text_file(file_path):
+    try:
+        with open(file_path, 'r') as file:
+            content = file.read()
+        return content
+    except FileNotFoundError:
+        print(f"The file at {file_path} was not found.")
+    except UnicodeDecodeError:
+        print(f"The file at {file_path} is not properly UTF-8 encoded.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+
 def run_raw_prompt_claude(prompt):
     print("Thinking -----< raw prompt >-----")
     if not claude_client:
@@ -424,6 +437,28 @@ def return_directory_path_or_fallback(input_text, fallback):
         return fallback
 
 
+def ask_expert(prompt, expert_file):
+    expert_def = read_text_file("./experts/" + expert_file)
+    print("Expert is thinking...")
+    response = client.chat.completions.create(
+      model=openai_model,
+      messages=[
+          {
+              "role": "system",
+              "content": expert_def
+          },
+          {
+              "role": "user",
+              "content": prompt
+        }
+      ],
+      temperature=0.7,
+      max_tokens=8192,
+      top_p=1
+    )
+    return response.choices[0].message.content
+
+
 def main():
     clipboard_text = pyperclip.paste()
     print("Input text ------------------------------")
@@ -441,10 +476,12 @@ def main():
                    "7.Summarize\n"
                    "8.Explain\n"
                    "9.Structure (structure a braindump)\n"
-                   "Z.Run clipboard as a raw prompt\n"
-                   "X.Type raw prompt...\n"
-                   "C.Type raw prompt (Claude AI) ...\n"
-                   "M.Generate auto-commit message  (Claude AI) {" + dir_path + "}\n"
+                   "Q.Run clipboard as a raw prompt\n"
+                   "W.Type raw prompt...\n"
+                   "E.Type raw prompt (Claude AI) ...\n"
+                   "R.Generate auto-commit message  (Claude AI) {" + dir_path + "}\n"
+                   "T.Ask expert (rendering)\n"
+                   "Y.Ask expert (cpp)\n"
                    "\n"
                    "0.Exit\n").strip().lower()
 
@@ -485,22 +522,30 @@ def main():
         answer = structure_braindump(clipboard_text)
         print(answer)
         pyperclip.copy(answer)
-    elif choice == 'Z' or choice == 'z':
+    elif choice == 'Q' or choice == 'q':
         answer = run_raw_prompt(clipboard_text)
         print(answer)
         pyperclip.copy(answer)
-    elif choice == 'X' or choice == 'x':
+    elif choice == 'W' or choice == 'w':
         user_raw_prompt = input("Q: Type your prompt here\n\n")
         answer = run_raw_prompt(user_raw_prompt)
         print(answer)
         pyperclip.copy(answer)
-    elif choice == 'C' or choice == 'c':
+    elif choice == 'E' or choice == 'e':
         user_raw_prompt = input("Q: Type your prompt here\n\n")
         answer = run_raw_prompt_claude(user_raw_prompt)
         print(answer)
         pyperclip.copy(answer)
-    elif choice == 'M' or choice == 'm':
+    elif choice == 'R' or choice == 'r':
         answer = generate_good_commit_message_claude(dir_path)
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == 'T' or choice == 't':
+        answer = ask_expert(clipboard_text, "rendering.txt")
+        print(answer)
+        pyperclip.copy(answer)
+    elif choice == 'Y' or choice == 'y':
+        answer = ask_expert(clipboard_text, "cpp.txt")
         print(answer)
         pyperclip.copy(answer)
     print("\nBye!")
