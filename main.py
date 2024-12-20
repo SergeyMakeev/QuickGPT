@@ -1,42 +1,37 @@
 import os
 import sys
+import json
 from openai import OpenAI
 import anthropic
 import pyperclip
 import subprocess
 
-openai_api_key = ""
-if len(sys.argv) > 1:
-    param = sys.argv[1]
-    openai_api_key = str(param)
-else:
-    print("No API Key was provided.")
-    exit(-1)
 
-client = OpenAI(
-  api_key=openai_api_key
-)
-
-
-anthropic_api_key = ""
-claude_client = None
-if len(sys.argv) > 2:
-    param = sys.argv[2]
-    anthropic_api_key = str(param)
-    claude_client = anthropic.Anthropic(api_key=anthropic_api_key)
-    # print("Anthropic models")
-    # models = claude_client.models.list()
-    # print(models)
-
-# print("OpenAI models")
-# models = client.models.list()
-# print(models)
-
-anthropic_model = "claude-3-5-sonnet-20241022"
+chatgpt_client = None
 openai_model = "chatgpt-4o-latest"
 
+claude_client = None
+anthropic_model = "claude-3-5-sonnet-20241022"
+
 # chatgpt | claude
-agent_name = "claude"
+agent_name = "chatgpt"
+
+
+def is_file_exist(file_path):
+    return os.path.isfile(file_path)
+
+
+def json_load(file_path: str):
+    if not is_file_exist(file_path):
+        return None
+    try:
+        with open(file_path) as json_file:
+            data = json.load(json_file)
+            return data
+    except IOError:
+        return None
+    except ValueError:
+        return None
 
 
 def read_text_file(file_path):
@@ -71,7 +66,7 @@ def do_chatgpt(context: str, input_text: str, max_tokens: int, input_text2=None)
            "content": input_text2
         })
 
-    response = client.chat.completions.create(
+    response = chatgpt_client.chat.completions.create(
       model=openai_model,
       messages=messages,
       temperature=0.7,
@@ -199,7 +194,7 @@ def generate_commit_message_claude(changes):
 
 
 def get_git_diff(working_dir):
-
+    print("generate git diff")
     if not os.path.isdir(working_dir):
         print(f"Working dir '{working_dir}' does not exist")
         return None
@@ -249,8 +244,30 @@ def return_directory_path_or_fallback(input_text, fallback):
         return fallback
 
 
+def initialize():
+    global chatgpt_client
+    global claude_client
+
+    api_keys = json_load("api_keys.json")
+
+    openai_api_key = api_keys.get('openai', None)
+    if openai_api_key:
+        chatgpt_client = OpenAI(api_key=openai_api_key)
+        # models = chatgpt_client.models.list()
+        # print(models)
+
+    anthropic_api_key = api_keys.get('anthropic', None)
+    if anthropic_api_key:
+        claude_client = anthropic.Anthropic(api_key=anthropic_api_key)
+        # models = claude_client.models.list()
+        # print(models)
+
+
 def main():
     global agent_name
+
+    initialize()
+
     clipboard_text = pyperclip.paste()
     print("Input text ------------------------------")
     print(clipboard_text)
@@ -258,7 +275,7 @@ def main():
     dir_path = return_directory_path_or_fallback(clipboard_text, ".")
 
     # Select an active agent if multiple agents are available
-    if claude_client is not None:
+    if claude_client and chatgpt_client:
         choice = input("\n\nQ: Agent name?\n"
                        "1.ChatGPT\n"
                        "2.Claudie\n"
