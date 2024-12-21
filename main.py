@@ -52,16 +52,18 @@ def read_text_file(file_path):
 
 def do_chatgpt(context: str, input_text: str, max_tokens: int, input_text2=None):
     max_tokens = min(max_tokens, 16384)
-    messages = [
-       {
-           "role": "system",
-           "content": context
-       },
-       {
-           "role": "user",
-           "content": input_text
-       }
-    ]
+    messages = []
+    if context and len(context) > 0:
+        messages.append({
+            "role": "system",
+            "content": context
+        })
+
+    if input_text and len(input_text) > 0:
+        messages.append({
+            "role": "user",
+            "content": input_text
+        })
 
     if input_text2 is not None:
         messages.append({
@@ -81,16 +83,18 @@ def do_chatgpt(context: str, input_text: str, max_tokens: int, input_text2=None)
 
 def do_claude(context: str, input_text: str, max_tokens: int, input_text2=None):
     max_tokens = min(max_tokens, 8192)
-    messages = [
-       {
-           "role": "user",
-           "content": context
-       },
-       {
-           "role": "user",
-           "content": input_text
-       }
-    ]
+    messages = []
+    if context and len(context) > 0:
+        messages.append({
+            "role": "user",
+            "content": context
+        })
+
+    if input_text and len(input_text) > 0:
+        messages.append({
+            "role": "user",
+            "content": input_text
+        })
 
     if input_text2 is not None:
         messages.append({
@@ -108,16 +112,18 @@ def do_claude(context: str, input_text: str, max_tokens: int, input_text2=None):
 
 def do_grok(context: str, input_text: str, max_tokens: int, input_text2=None):
     max_tokens = min(max_tokens, 131072)
-    messages = [
-       {
-           "role": "user",
-           "content": context
-       },
-       {
-           "role": "user",
-           "content": input_text
-       }
-    ]
+    messages = []
+    if context and len(context) > 0:
+        messages.append({
+            "role": "user",
+            "content": context
+        })
+
+    if input_text and len(input_text) > 0:
+        messages.append({
+            "role": "user",
+            "content": input_text
+        })
 
     if input_text2 is not None:
         messages.append({
@@ -164,25 +170,6 @@ def ask_expert(prompt, expert_file):
     else:
         print("Unsupported agent name " + agent_name)
         return prompt
-
-
-def run_raw_prompt_claude(prompt):
-    print("Thinking -----< raw prompt >-----")
-    if not claude_client:
-        print("No Anthropic API key was provided")
-        return
-
-    message = claude_client.messages.create(
-        model=anthropic_model,
-        max_tokens=1024,
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    )
-    return message.content[0].text
 
 
 def generate_commit_message_claude(changes):
