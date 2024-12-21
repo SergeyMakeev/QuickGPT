@@ -13,7 +13,10 @@ openai_model = "chatgpt-4o-latest"
 claude_client = None
 anthropic_model = "claude-3-5-sonnet-20241022"
 
-# chatgpt | claude
+grok_client = None
+xai_model = "grok-2-1212"
+
+# chatgpt | claude | grok
 agent_name = "chatgpt"
 
 
@@ -103,7 +106,34 @@ def do_claude(context: str, input_text: str, max_tokens: int, input_text2=None):
     return message.content[0].text.strip()
 
 
-def run_chatgpt_task(task_name: str, text: str, max_tokens: int, input_text2=None):
+def do_grok(context: str, input_text: str, max_tokens: int, input_text2=None):
+    max_tokens = min(max_tokens, 131072)
+    messages = [
+       {
+           "role": "user",
+           "content": context
+       },
+       {
+           "role": "user",
+           "content": input_text
+       }
+    ]
+
+    if input_text2 is not None:
+        messages.append({
+           "role": "user",
+           "content": input_text2
+        })
+
+    message = grok_client.messages.create(
+        model=xai_model,
+        max_tokens=max_tokens,
+        messages=messages
+    )
+    return message.content[0].text.strip()
+
+
+def run_task(task_name: str, text: str, max_tokens: int, input_text2=None):
     task_context = read_text_file("./tasks/" + task_name)
 
     if agent_name == "chatgpt":
@@ -112,23 +142,25 @@ def run_chatgpt_task(task_name: str, text: str, max_tokens: int, input_text2=Non
     elif agent_name == "claude":
         print("Claude is thinking... -< " + task_name + " >-")
         return do_claude(task_context, text, max_tokens, input_text2)
+    elif agent_name == "grok":
+        print("Grok is thinking... -< " + task_name + " >-")
+        return do_grok(task_context, text, max_tokens, input_text2)
     else:
         print("Unsupported agent name " + agent_name)
         return text
-
-
-def run_task(task_name: str, text: str, max_tokens: int, input_text2=None):
-    return run_chatgpt_task(task_name, text, max_tokens, input_text2)
 
 
 def ask_expert(prompt, expert_file):
     task_context = read_text_file("./experts/" + expert_file)
     if agent_name == "chatgpt":
         print("ChatGPT. Expert is thinking... -< " + expert_file + " >-")
-        return do_chatgpt(task_context, prompt, 16384)
+        return do_chatgpt(task_context, prompt, 131072)
     elif agent_name == "claude":
         print("Claude. Expert is thinking... -< " + expert_file + " >-")
-        return do_claude(task_context, prompt, 16384)
+        return do_claude(task_context, prompt, 131072)
+    elif agent_name == "grok":
+        print("Grok. Expert is thinking... -< " + expert_file + " >-")
+        return do_claude(task_context, prompt, 131072)
     else:
         print("Unsupported agent name " + agent_name)
         return prompt
@@ -247,6 +279,7 @@ def return_directory_path_or_fallback(input_text, fallback):
 def initialize():
     global chatgpt_client
     global claude_client
+    global grok_client
 
     api_keys = json_load("api_keys.json")
 
@@ -262,6 +295,12 @@ def initialize():
         # models = claude_client.models.list()
         # print(models)
 
+    xai_api_key = api_keys.get('xai', None)
+    if xai_api_key:
+        grok_client = anthropic.Anthropic(api_key=xai_api_key, base_url="https://api.x.ai",)
+        # models = grok_client.models.list()
+        # print(models)
+
 
 def main():
     global agent_name
@@ -269,25 +308,54 @@ def main():
     initialize()
 
     clipboard_text = pyperclip.paste()
-    print("Input text ------------------------------")
-    print(clipboard_text)
 
     dir_path = return_directory_path_or_fallback(clipboard_text, ".")
 
+    agents = []
+    if chatgpt_client:
+        agents.append('chatgpt')
+
+    if claude_client:
+        agents.append('claude')
+
+    if grok_client:
+        agents.append('grok')
+
+    if len(agents) == 0:
+        print("No agents found!")
+        return
+
+    agent_name = agents[0]
+
     # Select an active agent if multiple agents are available
-    if claude_client and chatgpt_client:
-        choice = input("\n\nQ: Agent name?\n"
-                       "1.ChatGPT\n"
-                       "2.Claudie\n"
-                       "\n"
-                       "0.Exit\n").strip().lower()
-        if choice == '1':
-            agent_name = 'chatgpt'
-        elif choice == '2':
-            agent_name = 'claude'
-        else:
+    if len(agents) > 1:
+        prompt = "\n\nQ: Agent name?\n"
+        agent_number = 1
+        for agent in agents:
+            agent_text = str(agent_number) + "." + agent + "\n"
+            prompt = prompt + agent_text
+            agent_number = agent_number + 1
+
+        prompt = prompt + "\n0.Exit\n"
+
+        choice = input(prompt).strip().lower()
+
+        agent_selected = False
+        agent_number = 1
+        for agent in agents:
+            if choice == str(agent_number):
+                agent_name = agent
+                agent_selected = True
+                break
+            agent_number = agent_number + 1
+
+        if not agent_selected:
             print("Bye!")
             return
+
+    print("Input text ------------------------------")
+    print(clipboard_text)
+    print("------------------------------")
 
     choice = input("\n\nQ: What to do? (" + agent_name + ")\n"
                    "1.Fix grammar\n"
