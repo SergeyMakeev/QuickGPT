@@ -106,7 +106,7 @@ def do_perplexity(context: str, input_text: str, max_tokens: int, input_text2=No
         })
 
     response = perplexity_client.chat.completions.create(
-      model=openai_model,
+      model=perplexity_model,
       messages=messages,
       temperature=0.7,
       max_tokens=max_tokens,
