@@ -16,7 +16,10 @@ anthropic_model = "claude-3-5-sonnet-20241022"
 grok_client = None
 xai_model = "grok-2-1212"
 
-# chatgpt | claude | grok
+perplexity_client = None
+perplexity_model = "llama-3.1-sonar-huge-128k-online"
+
+# chatgpt | claude | grok | perplexity
 agent_name = "chatgpt"
 
 
@@ -72,6 +75,37 @@ def do_chatgpt(context: str, input_text: str, max_tokens: int, input_text2=None)
         })
 
     response = chatgpt_client.chat.completions.create(
+      model=openai_model,
+      messages=messages,
+      temperature=0.7,
+      max_tokens=max_tokens,
+      top_p=1
+    )
+    return response.choices[0].message.content
+
+
+def do_perplexity(context: str, input_text: str, max_tokens: int, input_text2=None):
+    max_tokens = min(max_tokens, 127072)
+    messages = []
+    if context and len(context) > 0:
+        messages.append({
+            "role": "system",
+            "content": context
+        })
+
+    if input_text and len(input_text) > 0:
+        messages.append({
+            "role": "user",
+            "content": input_text
+        })
+
+    if input_text2 is not None:
+        messages.append({
+           "role": "user",
+           "content": input_text2
+        })
+
+    response = perplexity_client.chat.completions.create(
       model=openai_model,
       messages=messages,
       temperature=0.7,
@@ -151,6 +185,9 @@ def run_task(task_name: str, text: str, max_tokens: int, input_text2=None):
     elif agent_name == "grok":
         print("Grok is thinking... -< " + task_name + " >-")
         return do_grok(task_context, text, max_tokens, input_text2)
+    elif agent_name == "perplexity":
+        print("Perplexity is thinking... -< " + task_name + " >-")
+        return do_perplexity(task_context, text, max_tokens, input_text2)
     else:
         print("Unsupported agent name " + agent_name)
         return text
@@ -166,7 +203,10 @@ def ask_expert(prompt, expert_file):
         return do_claude(task_context, prompt, 131072)
     elif agent_name == "grok":
         print("Grok. Expert is thinking... -< " + expert_file + " >-")
-        return do_claude(task_context, prompt, 131072)
+        return do_grok(task_context, prompt, 131072)
+    elif agent_name == "perplexity":
+        print("Perplexity. Expert is thinking... -< " + expert_file + " >-")
+        return do_perplexity(task_context, prompt, 131072)
     else:
         print("Unsupported agent name " + agent_name)
         return prompt
@@ -267,6 +307,7 @@ def initialize():
     global chatgpt_client
     global claude_client
     global grok_client
+    global perplexity_client
 
     api_keys = json_load("api_keys.json")
 
@@ -288,6 +329,12 @@ def initialize():
         # models = grok_client.models.list()
         # print(models)
 
+    perplexity_api_key = api_keys.get('perplexity', None)
+    if perplexity_api_key:
+        perplexity_client = OpenAI(api_key=perplexity_api_key, base_url="https://api.perplexity.ai")
+        # models = chatgpt_client.models.list()
+        # print(models)
+
 
 def main():
     global agent_name
@@ -307,6 +354,9 @@ def main():
 
     if grok_client:
         agents.append('grok')
+
+    if perplexity_client:
+        agents.append('perplexity')
 
     if len(agents) == 0:
         print("No agents found!")
