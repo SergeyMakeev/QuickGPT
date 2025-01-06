@@ -7,6 +7,11 @@ You are given a Git diff as input. Your task is to review the provided code and 
 - better performance
 - find any logical or security concerns
 - find and suggest better alternatives
-- suggest better naming
+- suggest better and more consistent naming
 - find any misleading comments and suggest how to fix them
+- check for memory leaks
+- potential memory stomps and out-of-bound access 
+- potential undefined behavior 
+- potential multi-threading and synchronization issues
+
 
