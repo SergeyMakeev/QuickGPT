@@ -19,16 +19,83 @@ xai_model = "grok-2-1212"
 perplexity_client = None
 perplexity_model = "llama-3.1-sonar-huge-128k-online"
 
-# chatgpt | claude | grok | perplexity
+deepseek_client = None
+deepseek_model = "deepseek-chat"
+
+
+# chatgpt | claude | grok | perplexity | deepseek
 agent_name = "chatgpt"
 
 
-def is_file_exist(file_path):
-    return os.path.isfile(file_path)
+# Note: different agents are using OpenAI API (they were intentionally made compatible)
+def run_openai(
+        client, model: str, context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+
+    print("Thinking\n")
+    messages = []
+    if context and len(context) > 0:
+        messages.append({
+            "role": "system",
+            "content": context
+        })
+
+    if input_text and len(input_text) > 0:
+        messages.append({
+            "role": "user",
+            "content": input_text
+        })
+
+    if input_text2 is not None:
+        messages.append({
+           "role": "user",
+           "content": input_text2
+        })
+
+    response = client.chat.completions.create(
+      model=model,
+      messages=messages,
+      temperature=temperature,
+      max_tokens=max_tokens
+    )
+    return response.choices[0].message.content
 
 
-def json_load(file_path: str):
-    if not is_file_exist(file_path):
+# Note: different agents are using Anthropic API (they were intentionally made compatible)
+def run_anthropic(
+        client, model: str, context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+
+    print("Thinking\n")
+    temperature = min(temperature, 1.0)
+    messages = []
+    if context and len(context) > 0:
+        messages.append({
+            "role": "user",
+            "content": context
+        })
+
+    if input_text and len(input_text) > 0:
+        messages.append({
+            "role": "user",
+            "content": input_text
+        })
+
+    if input_text2 is not None:
+        messages.append({
+           "role": "user",
+           "content": input_text2
+        })
+
+    message = client.messages.create(
+        model=model,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        messages=messages
+    )
+    return message.content[0].text.strip()
+
+
+def load_json(file_path: str):
+    if not os.path.isfile(file_path):
         return None
     try:
         with open(file_path) as json_file:
@@ -40,7 +107,7 @@ def json_load(file_path: str):
         return None
 
 
-def read_text_file(file_path):
+def read_file(file_path):
     try:
         with open(file_path, 'r') as file:
             content = file.read()
@@ -53,207 +120,65 @@ def read_text_file(file_path):
         print(f"An error occurred: {e}")
 
 
-def do_chatgpt(context: str, input_text: str, max_tokens: int, input_text2=None):
+def run_chatgpt(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
     max_tokens = min(max_tokens, 16384)
-    messages = []
-    if context and len(context) > 0:
-        messages.append({
-            "role": "system",
-            "content": context
-        })
-
-    if input_text and len(input_text) > 0:
-        messages.append({
-            "role": "user",
-            "content": input_text
-        })
-
-    if input_text2 is not None:
-        messages.append({
-           "role": "user",
-           "content": input_text2
-        })
-
-    response = chatgpt_client.chat.completions.create(
-      model=openai_model,
-      messages=messages,
-      temperature=0.7,
-      max_tokens=max_tokens,
-      top_p=1
-    )
-    return response.choices[0].message.content
+    return run_openai(chatgpt_client, openai_model, context, input_text, temperature, max_tokens, input_text2)
 
 
-def do_perplexity(context: str, input_text: str, max_tokens: int, input_text2=None):
+def run_perplexity(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
     max_tokens = min(max_tokens, 127072)
-    messages = []
-    if context and len(context) > 0:
-        messages.append({
-            "role": "system",
-            "content": context
-        })
-
-    if input_text and len(input_text) > 0:
-        messages.append({
-            "role": "user",
-            "content": input_text
-        })
-
-    if input_text2 is not None:
-        messages.append({
-           "role": "user",
-           "content": input_text2
-        })
-
-    response = perplexity_client.chat.completions.create(
-      model=perplexity_model,
-      messages=messages,
-      temperature=0.7,
-      max_tokens=max_tokens,
-      top_p=1
-    )
-    return response.choices[0].message.content
+    return run_openai(perplexity_client, perplexity_model, context, input_text, temperature, max_tokens, input_text2)
 
 
-def do_claude(context: str, input_text: str, max_tokens: int, input_text2=None):
+def run_deepseek(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
     max_tokens = min(max_tokens, 8192)
-    messages = []
-    if context and len(context) > 0:
-        messages.append({
-            "role": "user",
-            "content": context
-        })
-
-    if input_text and len(input_text) > 0:
-        messages.append({
-            "role": "user",
-            "content": input_text
-        })
-
-    if input_text2 is not None:
-        messages.append({
-           "role": "user",
-           "content": input_text2
-        })
-
-    message = claude_client.messages.create(
-        model=anthropic_model,
-        max_tokens=max_tokens,
-        messages=messages
-    )
-    return message.content[0].text.strip()
+    return run_openai(deepseek_client, deepseek_model, context, input_text, temperature, max_tokens, input_text2)
 
 
-def do_grok(context: str, input_text: str, max_tokens: int, input_text2=None):
+def run_claude(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+    max_tokens = min(max_tokens, 8192)
+    return run_anthropic(claude_client, anthropic_model, context, input_text, temperature, max_tokens, input_text2)
+
+
+def run_grok(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
     max_tokens = min(max_tokens, 131072)
-    messages = []
-    if context and len(context) > 0:
-        messages.append({
-            "role": "user",
-            "content": context
-        })
-
-    if input_text and len(input_text) > 0:
-        messages.append({
-            "role": "user",
-            "content": input_text
-        })
-
-    if input_text2 is not None:
-        messages.append({
-           "role": "user",
-           "content": input_text2
-        })
-
-    message = grok_client.messages.create(
-        model=xai_model,
-        max_tokens=max_tokens,
-        messages=messages
-    )
-    return message.content[0].text.strip()
+    return run_anthropic(grok_client, xai_model, context, input_text, temperature, max_tokens, input_text2)
 
 
-def run_task(task_name: str, text: str, max_tokens: int, input_text2=None):
-    task_context = read_text_file("./tasks/" + task_name)
+# function routing table
+agent_functions = {
+    "chatgpt": run_chatgpt,
+    "claude": run_claude,
+    "grok": run_grok,
+    "perplexity": run_perplexity,
+    "deepseek": run_deepseek,
+}
 
-    if agent_name == "chatgpt":
-        print("ChatGPT is thinking... -< " + task_name + " >-")
-        return do_chatgpt(task_context, text, max_tokens, input_text2)
-    elif agent_name == "claude":
-        print("Claude is thinking... -< " + task_name + " >-")
-        return do_claude(task_context, text, max_tokens, input_text2)
-    elif agent_name == "grok":
-        print("Grok is thinking... -< " + task_name + " >-")
-        return do_grok(task_context, text, max_tokens, input_text2)
-    elif agent_name == "perplexity":
-        print("Perplexity is thinking... -< " + task_name + " >-")
-        return do_perplexity(task_context, text, max_tokens, input_text2)
+
+def run_agent_task(task_name: str, text: str, temperature: float, max_tokens: int, input_text2=None):
+    task_context = read_file(os.path.join("tasks", task_name))
+
+    if agent_name in agent_functions:
+        return agent_functions[agent_name](task_context, text, temperature, max_tokens, input_text2)
     else:
-        print("Unsupported agent name " + agent_name)
+        print(f"Unsupported agent name: {agent_name}")
         return text
 
 
 def ask_expert(prompt, expert_file):
-    task_context = read_text_file("./experts/" + expert_file)
-    if agent_name == "chatgpt":
-        print("ChatGPT. Expert is thinking... -< " + expert_file + " >-")
-        return do_chatgpt(task_context, prompt, 131072)
-    elif agent_name == "claude":
-        print("Claude. Expert is thinking... -< " + expert_file + " >-")
-        return do_claude(task_context, prompt, 131072)
-    elif agent_name == "grok":
-        print("Grok. Expert is thinking... -< " + expert_file + " >-")
-        return do_grok(task_context, prompt, 131072)
-    elif agent_name == "perplexity":
-        print("Perplexity. Expert is thinking... -< " + expert_file + " >-")
-        return do_perplexity(task_context, prompt, 131072)
+    temperature = 0.7
+    max_tokens = 131072
+    task_context = read_file(os.path.join("experts", expert_file))
+
+    if agent_name in agent_functions:
+        return agent_functions[agent_name](task_context, prompt, temperature, max_tokens)
     else:
-        print("Unsupported agent name " + agent_name)
+        print(f"Unsupported agent name: {agent_name}")
         return prompt
 
 
-def generate_commit_message_claude(changes):
-    message = claude_client.messages.create(
-        model=anthropic_model,
-        max_tokens=5000,
-        messages=[
-            {
-                "role": "user",
-                "content": "You are an assistant that generates helpful and concise git commit messages. "
-                           "Here is the guideline to write a good commit message.\n"
-                           "A good commit message describes the following:\n"
-                           "- Commit message should start with a descriptive subject line (72 characters max)\n"
-                           "- Why is the change being made?\n"
-                           "- What is the summary of the changes being made?\n"
-                           "- What are the possible consequences of the change being made on the rest of the system?\n"
-                           "- If the change is performance or memory related, what is the summary of expected impact?\n"
-                           "- If the change changes API, what is the expected user-observed behavior if any?\n"
-                           "Basically think about this this way. "
-                           "Five years later, somebody will hit a problem and trace it to your change. "
-                           "They will want to understand more about the change but you may not remember the details or "
-                           "may not work at the company. "
-                           "What's more, there is no guarantee that the JIRA ticket linked would contain any "
-                           "actionable info - it definitely would not contain some of the details mentioned!\n"
-                           "Please always use active voice, and preferably just imperative.\n"
-                           "Here are a few examples:\n"
-                           "Bad\n"
-                           "'The code was fixed to avoid a NULL pointer dereference'\n"
-                           "OK(ish)\n"
-                           "'This fixes a NULL pointer dereference'\n"
-                           "Good (Preferable)\n"
-                           "'Fix NULL pointer dereference'\n",
-            },
-            {
-                "role": "user",
-                "content": f"Generate a good commit message for the following changes\n\n{changes}",
-            }
-        ]
-    )
-    return message.content[0].text.strip()
-
-
 def get_git_diff(working_dir):
-    print("generate git diff")
+    print("Generate git diff")
     if not os.path.isdir(working_dir):
         print(f"Working dir '{working_dir}' does not exist")
         return None
@@ -275,18 +200,8 @@ def get_git_diff(working_dir):
         print(result.stderr)
 
     os.chdir(original_dir)
-    return result.stdout
-
-
-def generate_good_commit_message_claude(git_repo_dir):
-    print("Thinking -----< Generate Commit Message >-----")
-    changes = get_git_diff(git_repo_dir)
-
-    if not changes:
-        print("No staged changes found.")
-        return
-
-    return generate_commit_message_claude(changes)
+    git_diff = result.stdout
+    return f"`````\n{git_diff}\n`````\n"
 
 
 def is_directory_path(path: str) -> bool:
@@ -308,8 +223,9 @@ def initialize():
     global claude_client
     global grok_client
     global perplexity_client
+    global deepseek_client
 
-    api_keys = json_load("api_keys.json")
+    api_keys = load_json("api_keys.json")
 
     openai_api_key = api_keys.get('openai', None)
     if openai_api_key:
@@ -332,8 +248,146 @@ def initialize():
     perplexity_api_key = api_keys.get('perplexity', None)
     if perplexity_api_key:
         perplexity_client = OpenAI(api_key=perplexity_api_key, base_url="https://api.perplexity.ai")
-        # models = chatgpt_client.models.list()
-        # print(models)
+
+    deepseek_api_key = api_keys.get('deepseek', None)
+    if deepseek_api_key:
+        deepseek_client = OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
+
+
+def display_menu(dir_path, clipboard_text):
+
+    def fix_grammar():
+        answer = run_agent_task("grammar.txt", clipboard_text, 0.7, 1024)
+        print(answer)
+        pyperclip.copy(answer)
+
+    def translate_ru():
+        answer = run_agent_task("ru.txt", clipboard_text, 1.3, 1024)
+        print(answer)
+        pyperclip.copy(answer)
+
+    def translate_en():
+        answer = run_agent_task("en.txt", clipboard_text, 1.3, 1024)
+        print(answer)
+        pyperclip.copy(answer)
+
+    def generate_commit_message():
+        staged_changes = get_git_diff(dir_path)
+        if not staged_changes:
+            print("No staged changes found.")
+        else:
+            answer = run_agent_task("commit_message.txt", staged_changes, 0.2, 16384)
+            print(answer)
+            pyperclip.copy(answer)
+
+    def code_review_changes():
+        staged_changes = get_git_diff(dir_path)
+        if not staged_changes:
+            print("No staged changes found.")
+        else:
+            answer = run_agent_task("code_review.txt", staged_changes, 0.1, 16384)
+            print(answer)
+            pyperclip.copy(answer)
+
+    def reply_to_email():
+        draft_answer = input("Q: What would you like me to reply?\n\n")
+        answer = run_agent_task("email_reply.txt", clipboard_text, 1.3, 1024, draft_answer)
+        print(answer)
+        pyperclip.copy(answer)
+
+    def summarize():
+        answer = run_agent_task("summarize.txt", clipboard_text, 0.7, 16384)
+        print(answer)
+        pyperclip.copy(answer)
+
+    def explain():
+        answer = run_agent_task("explain.txt", clipboard_text, 0.7, 16384)
+        print(answer)
+        pyperclip.copy(answer)
+
+    def structure_braindump():
+        answer = run_agent_task("braindump.txt", clipboard_text, 0.5, 16384)
+        print(answer)
+        pyperclip.copy(answer)
+
+    def fix_commit_message():
+        answer = run_agent_task("fix_commit_message.txt", clipboard_text, 0.7, 1024)
+        print(answer)
+        pyperclip.copy(answer)
+
+    def raw_prompt():
+        answer = run_agent_task("raw.txt", clipboard_text, 1.0, 8192)
+        print(answer)
+        pyperclip.copy(answer)
+
+    def custom_raw_prompt():
+        user_raw_prompt = input("Q: Type your prompt here\n\n")
+        answer = run_agent_task("raw.txt", user_raw_prompt, 1.0, 8192)
+        print(answer)
+        pyperclip.copy(answer)
+
+    def ask_rendering_expert():
+        answer = ask_expert(clipboard_text, "rendering.txt")
+        print(answer)
+        pyperclip.copy(answer)
+
+    def ask_cpp_expert():
+        answer = ask_expert(clipboard_text, "cpp.txt")
+        print(answer)
+        pyperclip.copy(answer)
+
+    def ask_manager_expert():
+        answer = ask_expert(clipboard_text, "manager.txt")
+        print(answer)
+        pyperclip.copy(answer)
+
+    def ask_entrepreneur_expert():
+        answer = ask_expert(clipboard_text, "entrepreneur.txt")
+        print(answer)
+        pyperclip.copy(answer)
+
+    # Build a dictionary of menu items: "key": (label, handler_function)
+    menu_items = {
+        "1": ("Fix grammar", fix_grammar),
+        "2": ("Translate to RU", translate_ru),
+        "3": ("Translate to EN", translate_en),
+        "4": ("Generate auto-commit message {" + dir_path + "}", generate_commit_message),
+        "5": ("Code review changes{" + dir_path + "}", code_review_changes),
+        "6": ("Reply to the email", reply_to_email),
+        "7": ("Summarize", summarize),
+        "8": ("Explain", explain),
+        "9": ("Structure (braindump)", structure_braindump),
+        "10": ("Fix commit message", fix_commit_message),
+        "11": ("Raw prompt", raw_prompt),
+        "12": ("Type raw prompt...", custom_raw_prompt),
+        "13": ("Ask expert (rendering)", ask_rendering_expert),
+        "14": ("Ask expert (cpp)", ask_cpp_expert),
+        "15": ("Ask expert (manager)", ask_manager_expert),
+        "16": ("Ask expert (entrepreneur)", ask_entrepreneur_expert),
+        "0": ("Exit", None)
+    }
+
+    while True:
+        # Display the menu
+        print("\nActions for:", agent_name)
+        for key, (label, _) in menu_items.items():
+            print(f"{key}. {label}")
+
+        choice = input("\nQ: What to do?\n").strip().lower()
+
+        if choice == "0":
+            print("Exiting...")
+            break
+
+        if choice in menu_items:
+            label, action = menu_items[choice]
+            if action:
+                action()  # Execute the corresponding function
+                break
+            else:
+                print("No action defined for this option.")
+        else:
+            print("Invalid choice. Please try again.")
 
 
 def main():
@@ -357,6 +411,9 @@ def main():
 
     if perplexity_client:
         agents.append('perplexity')
+
+    if deepseek_client:
+        agents.append('deepseek')
 
     if len(agents) == 0:
         print("No agents found!")
@@ -394,91 +451,8 @@ def main():
     print(clipboard_text)
     print("------------------------------")
 
-    choice = input("\n\nQ: What to do? (" + agent_name + ")\n"
-                   "1.Fix grammar\n"
-                   "2.Translate to RU\n"
-                   "3.Translate to EN\n"
-                   "4.Generate auto-commit message {" + dir_path + "}\n"
-                   "5.Fix commit message\n"
-                   "6.Reply to the email...\n"
-                   "7.Summarize\n"
-                   "8.Explain\n"
-                   "9.Structure (structure a braindump)\n"
-                   "10.Raw prompt\n"
-                   "11.Type raw prompt...\n"
-                   "12.Ask expert (rendering)\n"
-                   "13.Ask expert (cpp)\n"
-                   "14.Ask expert (manager)\n"
-                   "15.Ask expert (entrepreneur)\n"
-                   "\n"
-                   "0.Exit\n").strip().lower()
+    display_menu(dir_path, clipboard_text)
 
-    if choice == '1':
-        answer = run_task("grammar.txt", clipboard_text, 1024)
-        print(answer)
-        pyperclip.copy(answer)
-    elif choice == '2':
-        answer = run_task("ru.txt", clipboard_text, 1024)
-        print(answer)
-        pyperclip.copy(answer)
-    elif choice == '3':
-        answer = run_task("en.txt", clipboard_text, 1024)
-        print(answer)
-        pyperclip.copy(answer)
-    elif choice == '4':
-        staged_changes = get_git_diff(dir_path)
-        if not staged_changes:
-            print("No staged changes found.")
-        else:
-            answer = run_task("commit_message.txt", staged_changes, 16384)
-            print(answer)
-            pyperclip.copy(answer)
-    elif choice == '5':
-        answer = run_task("fix_commit_message.txt", clipboard_text, 1024)
-        print(answer)
-        pyperclip.copy(answer)
-    elif choice == '6':
-        draft_answer = input("Q: What would you like me to reply?\n\n")
-        answer = run_task("email_reply.txt", clipboard_text, 1024, draft_answer)
-        print(answer)
-        pyperclip.copy(answer)
-    elif choice == '7':
-        answer = run_task("summarize.txt", clipboard_text, 16384)
-        print(answer)
-        pyperclip.copy(answer)
-    elif choice == '8':
-        answer = run_task("explain.txt", clipboard_text, 16384)
-        print(answer)
-        pyperclip.copy(answer)
-    elif choice == '9':
-        answer = run_task("braindump.txt", clipboard_text, 16384)
-        print(answer)
-        pyperclip.copy(answer)
-    elif choice == '10':
-        answer = run_task("raw.txt", clipboard_text, 8192)
-        print(answer)
-        pyperclip.copy(answer)
-    elif choice == '11':
-        user_raw_prompt = input("Q: Type your prompt here\n\n")
-        answer = run_task("raw.txt", user_raw_prompt, 8192)
-        print(answer)
-        pyperclip.copy(answer)
-    elif choice == '12':
-        answer = ask_expert(clipboard_text, "rendering.txt")
-        print(answer)
-        pyperclip.copy(answer)
-    elif choice == '13':
-        answer = ask_expert(clipboard_text, "cpp.txt")
-        print(answer)
-        pyperclip.copy(answer)
-    elif choice == '14':
-        answer = ask_expert(clipboard_text, "manager.txt")
-        print(answer)
-        pyperclip.copy(answer)
-    elif choice == '15':
-        answer = ask_expert(clipboard_text, "entrepreneur.txt")
-        print(answer)
-        pyperclip.copy(answer)
     print("\nBye!")
 
 
