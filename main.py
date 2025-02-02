@@ -5,6 +5,7 @@ from openai import OpenAI
 import anthropic
 import pyperclip
 import subprocess
+import requests
 
 
 chatgpt_client = None
@@ -390,7 +391,26 @@ def display_menu(dir_path, clipboard_text):
             print("Invalid choice. Please try again.")
 
 
+def query_ollama(model: str, prompt: str):
+    url = "http://localhost:11434/api/generate"
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False
+    }
+
+    response = requests.post(url, headers=headers, data=json.dumps(data))
+    if response.status_code == 200:
+        result = response.json()
+        print("Response:", result.get("response", "No response"))
+    else:
+        print("Error:", response.status_code, response.text)
+
+
 def main():
+    # query_ollama("deepseek-r1", "Why is the sky blue?")
+
     global agent_name
 
     initialize()
