@@ -1,12 +1,13 @@
 import os
 import sys
 import json
-from openai import OpenAI
+import openai
 import anthropic
 import pyperclip
 import subprocess
+import ollama
 import requests
-
+import re
 
 chatgpt_client = None
 openai_model = "chatgpt-4o-latest"
@@ -23,8 +24,13 @@ perplexity_model = "llama-3.1-sonar-huge-128k-online"
 deepseek_client = None
 deepseek_model = "deepseek-chat"
 
+# ollama (local)
+ollama_client = None
+ollama_model = "deepseek-r1:14b"
+# "ollama" : "http://localhost:11434"
+ollama_host = None
 
-# chatgpt | claude | grok | perplexity | deepseek
+# chatgpt | claude | grok | perplexity | deepseek | ollama
 agent_name = "chatgpt"
 
 
@@ -95,6 +101,39 @@ def run_anthropic(
     return message.content[0].text.strip()
 
 
+def run_ollama(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+    assert (isinstance(ollama_client, ollama.Client))
+    max_tokens = min(max_tokens, 32768)
+    print("Thinking\n")
+
+    messages = []
+    if context and len(context) > 0:
+        messages.append({
+            "role": "user",
+            "content": context
+        })
+
+    if input_text and len(input_text) > 0:
+        messages.append({
+            "role": "user",
+            "content": input_text
+        })
+
+    if input_text2 is not None:
+        messages.append({
+           "role": "user",
+           "content": input_text2
+        })
+
+    response = ollama_client.chat(
+        model=ollama_model,
+        messages=messages,
+    )
+    res = response['message']['content']
+    cleaned_content = re.sub(r"<think>.*?</think>\n?", "", res, flags=re.DOTALL)
+    return cleaned_content
+
+
 def load_json(file_path: str):
     if not os.path.isfile(file_path):
         return None
@@ -122,26 +161,31 @@ def read_file(file_path):
 
 
 def run_chatgpt(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+    assert(isinstance(chatgpt_client, openai.OpenAI))
     max_tokens = min(max_tokens, 16384)
     return run_openai(chatgpt_client, openai_model, context, input_text, temperature, max_tokens, input_text2)
 
 
 def run_perplexity(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+    assert (isinstance(perplexity_client, openai.OpenAI))
     max_tokens = min(max_tokens, 127072)
     return run_openai(perplexity_client, perplexity_model, context, input_text, temperature, max_tokens, input_text2)
 
 
 def run_deepseek(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+    assert (isinstance(deepseek_client, openai.OpenAI))
     max_tokens = min(max_tokens, 8192)
     return run_openai(deepseek_client, deepseek_model, context, input_text, temperature, max_tokens, input_text2)
 
 
 def run_claude(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+    assert (isinstance(claude_client, anthropic.Anthropic))
     max_tokens = min(max_tokens, 8192)
     return run_anthropic(claude_client, anthropic_model, context, input_text, temperature, max_tokens, input_text2)
 
 
 def run_grok(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+    assert (isinstance(grok_client, anthropic.Anthropic))
     max_tokens = min(max_tokens, 131072)
     return run_anthropic(grok_client, xai_model, context, input_text, temperature, max_tokens, input_text2)
 
@@ -153,6 +197,7 @@ agent_functions = {
     "grok": run_grok,
     "perplexity": run_perplexity,
     "deepseek": run_deepseek,
+    "ollama": run_ollama,
 }
 
 
@@ -219,18 +264,32 @@ def return_directory_path_or_fallback(input_text, fallback):
         return fallback
 
 
+def check_ollama_availability(url):
+    # print("Check if ollama is available")
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raises an HTTPError for bad responses (4xx or 5xx)
+        # print("ollama is available!")
+        return True
+    except requests.exceptions.RequestException as e:
+        print(f"Error: Could not connect to Ollama server at {url}. {e}")
+        return False
+
+
 def initialize():
     global chatgpt_client
     global claude_client
     global grok_client
     global perplexity_client
     global deepseek_client
+    global ollama_client
+    global ollama_host
 
     api_keys = load_json("api_keys.json")
 
     openai_api_key = api_keys.get('openai', None)
     if openai_api_key:
-        chatgpt_client = OpenAI(api_key=openai_api_key)
+        chatgpt_client = openai.OpenAI(api_key=openai_api_key)
         # models = chatgpt_client.models.list()
         # print(models)
 
@@ -248,11 +307,15 @@ def initialize():
 
     perplexity_api_key = api_keys.get('perplexity', None)
     if perplexity_api_key:
-        perplexity_client = OpenAI(api_key=perplexity_api_key, base_url="https://api.perplexity.ai")
+        perplexity_client = openai.OpenAI(api_key=perplexity_api_key, base_url="https://api.perplexity.ai")
 
     deepseek_api_key = api_keys.get('deepseek', None)
     if deepseek_api_key:
-        deepseek_client = OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
+        deepseek_client = openai.OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
+
+    ollama_host = api_keys.get('ollama', None)
+    if ollama_host and check_ollama_availability(ollama_host):
+        ollama_client = ollama.Client(host=ollama_host)
 
 
 def display_menu(dir_path, clipboard_text):
@@ -391,26 +454,7 @@ def display_menu(dir_path, clipboard_text):
             print("Invalid choice. Please try again.")
 
 
-def query_ollama(model: str, prompt: str):
-    url = "http://localhost:11434/api/generate"
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "model": model,
-        "prompt": prompt,
-        "stream": False
-    }
-
-    response = requests.post(url, headers=headers, data=json.dumps(data))
-    if response.status_code == 200:
-        result = response.json()
-        print("Response:", result.get("response", "No response"))
-    else:
-        print("Error:", response.status_code, response.text)
-
-
 def main():
-    # query_ollama("deepseek-r1", "Why is the sky blue?")
-
     global agent_name
 
     initialize()
@@ -434,6 +478,9 @@ def main():
 
     if deepseek_client:
         agents.append('deepseek')
+
+    if ollama_client:
+        agents.append('ollama')
 
     if len(agents) == 0:
         print("No agents found!")

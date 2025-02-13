@@ -1,6 +1,8 @@
 # Run:
-# > pip install -r requirements.txt
+#  pip install -r requirements.txt
 
 openai
 anthropic
 pyperclip
+ollama
+httpx==0.27.2
