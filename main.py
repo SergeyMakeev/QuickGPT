@@ -26,7 +26,7 @@ deepseek_model = "deepseek-chat"
 
 # ollama (local)
 ollama_client = None
-ollama_model = "deepseek-r1:14b"
+ollama_model = "deepseek-r1:latest"
 # "ollama" : "http://localhost:11434"
 ollama_host = None
 
