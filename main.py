@@ -10,16 +10,16 @@ import requests
 import re
 
 chatgpt_client = None
-openai_model = "chatgpt-4o-latest"
+openai_model = "gpt-4.5-preview"
 
 claude_client = None
-anthropic_model = "claude-3-5-sonnet-20241022"
+anthropic_model = "claude-3-7-sonnet-20250219"
 
 grok_client = None
 xai_model = "grok-2-1212"
 
 perplexity_client = None
-perplexity_model = "llama-3.1-sonar-huge-128k-online"
+perplexity_model = "r1-1776"
 
 deepseek_client = None
 deepseek_model = "deepseek-chat"
@@ -308,10 +308,15 @@ def initialize():
     perplexity_api_key = api_keys.get('perplexity', None)
     if perplexity_api_key:
         perplexity_client = openai.OpenAI(api_key=perplexity_api_key, base_url="https://api.perplexity.ai")
+        # models = perplexity_client.models.list()
+        # print(models)
 
     deepseek_api_key = api_keys.get('deepseek', None)
     if deepseek_api_key:
         deepseek_client = openai.OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
+        # models = deepseek_client.models.list()
+        # print(models)
+
 
     ollama_host = api_keys.get('ollama', None)
     if ollama_host and check_ollama_availability(ollama_host):
