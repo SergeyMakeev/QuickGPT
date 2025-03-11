@@ -8,6 +8,7 @@ import subprocess
 import ollama
 import requests
 import re
+from google import genai
 
 chatgpt_client = None
 openai_model = "gpt-4.5-preview"
@@ -30,7 +31,10 @@ ollama_model = "deepseek-r1:latest"
 # "ollama" : "http://localhost:11434"
 ollama_host = None
 
-# chatgpt | claude | grok | perplexity | deepseek | ollama
+google_client = None
+google_model = "gemini-2.0-flash"
+
+# chatgpt | claude | grok | perplexity | deepseek | ollama | google
 agent_name = "chatgpt"
 
 
@@ -134,6 +138,39 @@ def run_ollama(context: str, input_text: str, temperature: float, max_tokens: in
     return cleaned_content
 
 
+def run_google(
+        context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+
+    print("Thinking\n")
+    messages = []
+
+    if input_text and len(input_text) > 0:
+        messages.append(input_text)
+
+    if input_text2 is not None:
+        messages.append(input_text2)
+
+    if context:
+        response = google_client.models.generate_content(
+            model=google_model,
+            contents=messages,
+            config=genai.types.GenerateContentConfig(
+                system_instruction=context,
+                temperature=temperature
+            )
+        )
+        return response.text
+    else:
+        response = google_client.models.generate_content(
+            model=google_model,
+            contents=messages,
+            config=genai.types.GenerateContentConfig(
+                temperature=temperature
+            )
+        )
+        return response.text
+
+
 def load_json(file_path: str):
     if not os.path.isfile(file_path):
         return None
@@ -198,6 +235,7 @@ agent_functions = {
     "perplexity": run_perplexity,
     "deepseek": run_deepseek,
     "ollama": run_ollama,
+    "google": run_google,
 }
 
 
@@ -284,6 +322,7 @@ def initialize():
     global deepseek_client
     global ollama_client
     global ollama_host
+    global google_client
 
     api_keys = load_json("api_keys.json")
 
@@ -317,6 +356,9 @@ def initialize():
         # models = deepseek_client.models.list()
         # print(models)
 
+    google_api_key = api_keys.get('google', None)
+    if google_api_key:
+        google_client = genai.Client(api_key=google_api_key)
 
     ollama_host = api_keys.get('ollama', None)
     if ollama_host and check_ollama_availability(ollama_host):
@@ -483,6 +525,9 @@ def main():
 
     if deepseek_client:
         agents.append('deepseek')
+
+    if google_client:
+        agents.append('google')
 
     if ollama_client:
         agents.append('ollama')
