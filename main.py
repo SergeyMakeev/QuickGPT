@@ -1,4 +1,9 @@
 import os
+
+# Remove proxy-related environment variables
+for key in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy']:
+    os.environ.pop(key, None)
+
 import sys
 import json
 import openai
