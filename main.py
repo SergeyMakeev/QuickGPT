@@ -13,6 +13,7 @@ import subprocess
 import ollama
 import requests
 import re
+import time
 from google import genai
 
 chatgpt_client = None
@@ -329,45 +330,86 @@ def initialize():
     global ollama_host
     global google_client
 
+    # List to store initialization times (model_name, init_time)
+    init_times = []
+
     api_keys = load_json("api_keys.json")
 
+    # OpenAI/ChatGPT initialization
     openai_api_key = api_keys.get('openai', None)
     if openai_api_key:
+        start_time = time.time()
         chatgpt_client = openai.OpenAI(api_key=openai_api_key)
+        init_time = time.time() - start_time
+        init_times.append(("ChatGPT", init_time))
         # models = chatgpt_client.models.list()
         # print(models)
 
+    # Anthropic/Claude initialization
     anthropic_api_key = api_keys.get('anthropic', None)
     if anthropic_api_key:
+        start_time = time.time()
         claude_client = anthropic.Anthropic(api_key=anthropic_api_key)
+        init_time = time.time() - start_time
+        init_times.append(("Claude", init_time))
         # models = claude_client.models.list()
         # print(models)
 
+    # XAI/Grok initialization
     xai_api_key = api_keys.get('xai', None)
     if xai_api_key:
+        start_time = time.time()
         grok_client = anthropic.Anthropic(api_key=xai_api_key, base_url="https://api.x.ai",)
+        init_time = time.time() - start_time
+        init_times.append(("Grok", init_time))
         # models = grok_client.models.list()
         # print(models)
 
+    # Perplexity initialization
     perplexity_api_key = api_keys.get('perplexity', None)
     if perplexity_api_key:
+        start_time = time.time()
         perplexity_client = openai.OpenAI(api_key=perplexity_api_key, base_url="https://api.perplexity.ai")
+        init_time = time.time() - start_time
+        init_times.append(("Perplexity", init_time))
         # models = perplexity_client.models.list()
         # print(models)
 
+    # DeepSeek initialization
     deepseek_api_key = api_keys.get('deepseek', None)
     if deepseek_api_key:
+        start_time = time.time()
         deepseek_client = openai.OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
+        init_time = time.time() - start_time
+        init_times.append(("DeepSeek", init_time))
         # models = deepseek_client.models.list()
         # print(models)
 
+    # Google/Gemini initialization
     google_api_key = api_keys.get('google', None)
     if google_api_key:
+        start_time = time.time()
         google_client = genai.Client(api_key=google_api_key)
+        init_time = time.time() - start_time
+        init_times.append(("Google", init_time))
 
+    # Ollama initialization
     ollama_host = api_keys.get('ollama', None)
     if ollama_host and check_ollama_availability(ollama_host):
+        start_time = time.time()
         ollama_client = ollama.Client(host=ollama_host)
+        init_time = time.time() - start_time
+        init_times.append(("Ollama", init_time))
+
+    # Print initialization times sorted from slowest to fastest
+    if init_times:
+        print("\nModel initialization times (slowest to fastest):")
+        print("-" * 50)
+        # Sort by init_time in descending order (slowest first)
+        sorted_times = sorted(init_times, key=lambda x: x[1], reverse=True)
+        for model_name, init_time in sorted_times:
+            print(f"{model_name:<12}: {init_time:.4f} seconds")
+        print("-" * 50)
 
 
 def display_menu(dir_path, clipboard_text):
