@@ -659,7 +659,7 @@ agent_functions = {
     "chatgpt": run_chatgpt,
     "claude": run_claude,
     "grok": run_grok,
-    "perplexity": run_perplexity,
+    "perplexity (search)": run_perplexity,
     "deepseek": run_deepseek,
     "ollama": run_ollama,
     "google": run_google,
