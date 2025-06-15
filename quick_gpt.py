@@ -1291,14 +1291,113 @@ def display_menu(dir_path):
         pyperclip.copy(answer)
         print(f"{Fore.CYAN}[OK] Copied to clipboard!{Style.RESET_ALL}")
 
-    def custom_raw_prompt():
-        user_raw_prompt = input(f"{Fore.CYAN}>> Type your custom prompt: {Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}[*] Processing custom prompt...{Style.RESET_ALL}")
-        answer = run_agent_task("raw.txt", user_raw_prompt, 1.0, 8192)
-        print(f"\n{Fore.GREEN}[RESULT]{Style.RESET_ALL}")
-        print(answer)
-        pyperclip.copy(answer)
-        print(f"{Fore.CYAN}[OK] Copied to clipboard!{Style.RESET_ALL}")
+    def custom_chat():
+        """
+        Start a custom chat session without predefined context
+        """
+        temperature = 0.7
+        max_tokens = 131072
+        
+        # Initialize empty conversation history (no predefined system context)
+        conversation_history = []
+        
+        # Ask user if they want to set a custom system context
+        print(f"\n{Fore.CYAN}>> Would you like to set a custom system context/role for the AI? (optional){Style.RESET_ALL}")
+        custom_context = input(f"{Fore.YELLOW}>> System context (press Enter to skip): {Style.RESET_ALL}").strip()
+        
+        if custom_context:
+            conversation_history.append({
+                "role": "system",
+                "content": custom_context
+            })
+        
+        last_response = None  # Track last response for copying
+        
+        print(f"\n{Back.BLUE}{Fore.WHITE}{'=' * 60}{Style.RESET_ALL}")
+        print(f"{Back.BLUE}{Fore.WHITE}                     Custom Chat Session                    {Style.RESET_ALL}")
+        print(f"{Back.BLUE}{Fore.WHITE}{'=' * 60}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}>> You are now in a custom chat session.{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}>> Type 'exit', 'quit', or 'back' to return to the main menu.{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}>> Type 'clear' to clear the conversation history.{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}>> Type 'copy' to copy the last response to clipboard.{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}>> Responses will stream in real-time for better interactivity.{Style.RESET_ALL}")
+        print(f"{Fore.BLUE}{'-' * 60}{Style.RESET_ALL}")
+        
+        while True:
+            # Get user input
+            user_input = input(f"\n{Fore.YELLOW}[You]: {Style.RESET_ALL}").strip()
+            
+            # Check for exit commands
+            if user_input.lower() in ['exit', 'quit', 'back']:
+                print(f"{Fore.CYAN}[INFO] Ending custom chat session.{Style.RESET_ALL}")
+                break
+            
+            # Check for clear command
+            if user_input.lower() == 'clear':
+                # Reset conversation history
+                conversation_history = []
+                if custom_context:
+                    conversation_history.append({
+                        "role": "system",
+                        "content": custom_context
+                    })
+                last_response = None
+                print(f"{Fore.GREEN}[INFO] Conversation history cleared.{Style.RESET_ALL}")
+                continue
+            
+            # Check for copy command
+            if user_input.lower() == 'copy':
+                if last_response:
+                    pyperclip.copy(last_response)
+                    print(f"{Fore.GREEN}[INFO] Last response copied to clipboard!{Style.RESET_ALL}")
+                else:
+                    print(f"{Fore.YELLOW}[INFO] No response to copy yet.{Style.RESET_ALL}")
+                continue
+            
+            # Skip empty inputs
+            if not user_input:
+                continue
+            
+            try:
+                # Get response using streaming
+                print(f"\n{Fore.MAGENTA}[AI]: {Style.RESET_ALL}", end="", flush=True)
+                
+                if agent_name in agent_functions:
+                    # Check if the agent function supports streaming
+                    import inspect
+                    sig = inspect.signature(agent_functions[agent_name])
+                    supports_streaming = 'stream' in sig.parameters
+                    
+                    if supports_streaming:
+                        response = agent_functions[agent_name](
+                            None,  # context is now in conversation_history
+                            user_input, 
+                            temperature, 
+                            max_tokens, 
+                            None,  # input_text2
+                            conversation_history,
+                            stream=True  # Enable streaming
+                        )
+                    else:
+                        # Fallback for agents that don't support streaming yet
+                        response = agent_functions[agent_name](
+                            None,  # context is now in conversation_history
+                            user_input, 
+                            temperature, 
+                            max_tokens, 
+                            None,  # input_text2
+                            conversation_history
+                        )
+                        print(f"{response}")
+                    
+                    last_response = response  # Store for potential copying
+                else:
+                    print(f"{Fore.RED}[ERROR] Unsupported agent name: {agent_name}{Style.RESET_ALL}")
+                    break
+                    
+            except Exception as e:
+                print(f"{Fore.RED}[ERROR] Failed to get response: {e}{Style.RESET_ALL}")
+                continue
 
     def ask_rendering_expert():
         chat_with_expert("rendering.txt", "Rendering")
@@ -1325,11 +1424,11 @@ def display_menu(dir_path):
         "9": ("Explain", explain),
         "10": ("Structure (braindump)", structure_braindump),
         "11": ("Raw prompt", raw_prompt),
-        "12": ("Custom prompt...", custom_raw_prompt),
-        "13": ("Chat with rendering expert", ask_rendering_expert),
-        "14": ("Chat with C++ expert", ask_cpp_expert),
-        "15": ("Chat with management expert", ask_manager_expert),
-        "16": ("Chat with entrepreneur expert", ask_entrepreneur_expert),
+        "12": ("Custom chat...", custom_chat),
+        "13": ("Chat with rendering expert...", ask_rendering_expert),
+        "14": ("Chat with C++ expert...", ask_cpp_expert),
+        "15": ("Chat with management expert...", ask_manager_expert),
+        "16": ("Chat with entrepreneur expert...", ask_entrepreneur_expert),
         "0": ("Exit", None)
     }
 
