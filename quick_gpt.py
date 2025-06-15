@@ -25,13 +25,13 @@ chatgpt_client = None
 openai_model = "gpt-4.5-preview"
 
 claude_client = None
-anthropic_model = "claude-3-7-sonnet-20250219"
+anthropic_model = "claude-opus-4-20250514"
 
 grok_client = None
-xai_model = "grok-2-1212"
+xai_model = "grok-3"
 
 perplexity_client = None
-perplexity_model = "r1-1776"
+perplexity_model = "sonar-reasoning-pro"
 
 deepseek_client = None
 deepseek_model = "deepseek-chat"
@@ -539,7 +539,7 @@ def run_chatgpt(context: str, input_text: str, temperature: float, max_tokens: i
 
 def run_perplexity(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None, conversation_history=None, stream=False):
     assert (isinstance(perplexity_client, openai.OpenAI))
-    max_tokens = min(max_tokens, 127072)
+    max_tokens = min(max_tokens, 100000)
     return run_openai(perplexity_client, perplexity_model, context, input_text, temperature, max_tokens, input_text2, conversation_history, stream)
 
 
@@ -951,18 +951,16 @@ def list_all_models():
             # Perplexity doesn't seem to support model listing via API
             # Let's show commonly available models based on their documentation
             perplexity_models = [
-                "llama-3.1-sonar-small-128k-online",
-                "llama-3.1-sonar-large-128k-online", 
-                "llama-3.1-sonar-huge-128k-online",
-                "llama-3.1-sonar-small-128k-chat",
-                "llama-3.1-sonar-large-128k-chat",
-                "llama-3.1-70b-instruct",
-                "llama-3.1-8b-instruct",
+                "sonar-pro",
+                "sonar", 
+                "sonar-deep-research",
+                "sonar-reasoning-pro",
+                "sonar-reasoning",
                 "r1-1776"
             ]
             for model in perplexity_models:
                 print(f"{Fore.WHITE}  • {model}{Style.RESET_ALL}")
-            print(f"{Fore.YELLOW}  [INFO] Perplexity doesn't support model listing via API. Showing common models.{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}  [INFO] Perplexity doesn't support model listing via API. https://docs.perplexity.ai/models/model-cards{Style.RESET_ALL}")
         except Exception as e:
             print(f"{Fore.RED}  [ERROR] Failed to fetch Perplexity models: {e}{Style.RESET_ALL}")
     
@@ -1011,26 +1009,32 @@ def list_all_models():
                 models_response = client.list()
                 ollama_models = []
                 
-                # Debug: Print response structure (can be removed later)
-                # print(f"DEBUG: Ollama response type: {type(models_response)}")
-                # print(f"DEBUG: Ollama response: {models_response}")
-                
-                # Handle different possible response structures
-                if isinstance(models_response, dict):
-                    if 'models' in models_response:
+                # Handle Ollama response structure
+                try:
+                    # The response has a 'models' attribute that contains a list of Model objects
+                    if hasattr(models_response, 'models'):
+                        for model in models_response.models:
+                            # Each model object has a 'model' attribute with the name
+                            if hasattr(model, 'model'):
+                                ollama_models.append(model.model)
+                            else:
+                                ollama_models.append(str(model))
+                    elif isinstance(models_response, dict) and 'models' in models_response:
+                        # Fallback for dict-style response
                         for model in models_response['models']:
                             if isinstance(model, dict):
-                                # Try different possible keys for model name
-                                model_name = model.get('name') or model.get('model') or model.get('id') or str(model)
-                                ollama_models.append(model_name)
+                                model_name = model.get('name') or model.get('model') or model.get('id')
+                                if model_name:
+                                    ollama_models.append(model_name)
                             else:
                                 ollama_models.append(str(model))
                     else:
-                        # If no 'models' key, try to use the response directly
-                        ollama_models = [str(models_response)]
-                else:
-                    # If response is not a dict, convert to string
-                    ollama_models = [str(models_response)]
+                        # Last resort fallback
+                        ollama_models = ["Unable to parse model list"]
+                        
+                except Exception as parse_error:
+                    print(f"{Fore.YELLOW}  [WARNING] Error parsing model list: {parse_error}{Style.RESET_ALL}")
+                    ollama_models = ["Error parsing models"]
                 
                 ollama_models.sort()
                 for model in ollama_models:
