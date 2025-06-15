@@ -777,6 +777,7 @@ def initialize():
     openai_api_key = api_keys.get('openai', None)
     if openai_api_key:
         print(f"{Fore.YELLOW}  [*] Initializing ChatGPT...{Style.RESET_ALL}", end="", flush=True)
+        sys.stdout.flush()  # Extra flush for problematic terminals
         start_time = time.time()
         chatgpt_client = openai.OpenAI(api_key=openai_api_key)
         init_time = time.time() - start_time
@@ -789,6 +790,7 @@ def initialize():
     anthropic_api_key = api_keys.get('anthropic', None)
     if anthropic_api_key:
         print(f"{Fore.YELLOW}  [*] Initializing Claude...{Style.RESET_ALL}", end="", flush=True)
+        sys.stdout.flush()  # Extra flush for problematic terminals
         start_time = time.time()
         claude_client = anthropic.Anthropic(api_key=anthropic_api_key)
         init_time = time.time() - start_time
@@ -801,6 +803,7 @@ def initialize():
     xai_api_key = api_keys.get('xai', None)
     if xai_api_key:
         print(f"{Fore.YELLOW}  [*] Initializing Grok...{Style.RESET_ALL}", end="", flush=True)
+        sys.stdout.flush()  # Extra flush for problematic terminals
         start_time = time.time()
         grok_client = anthropic.Anthropic(api_key=xai_api_key, base_url="https://api.x.ai",)
         init_time = time.time() - start_time
@@ -813,6 +816,7 @@ def initialize():
     perplexity_api_key = api_keys.get('perplexity', None)
     if perplexity_api_key:
         print(f"{Fore.YELLOW}  [*] Initializing Perplexity...{Style.RESET_ALL}", end="", flush=True)
+        sys.stdout.flush()  # Extra flush for problematic terminals
         start_time = time.time()
         perplexity_client = openai.OpenAI(api_key=perplexity_api_key, base_url="https://api.perplexity.ai")
         init_time = time.time() - start_time
@@ -825,6 +829,7 @@ def initialize():
     deepseek_api_key = api_keys.get('deepseek', None)
     if deepseek_api_key:
         print(f"{Fore.YELLOW}  [*] Initializing DeepSeek...{Style.RESET_ALL}", end="", flush=True)
+        sys.stdout.flush()  # Extra flush for problematic terminals
         start_time = time.time()
         deepseek_client = openai.OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
         init_time = time.time() - start_time
@@ -837,6 +842,7 @@ def initialize():
     google_api_key = api_keys.get('google', None)
     if google_api_key:
         print(f"{Fore.YELLOW}  [*] Initializing Google...{Style.RESET_ALL}", end="", flush=True)
+        sys.stdout.flush()  # Extra flush for problematic terminals
         start_time = time.time()
         google_client = genai.Client(api_key=google_api_key)
         init_time = time.time() - start_time
@@ -845,13 +851,19 @@ def initialize():
 
     # Ollama initialization
     ollama_host = api_keys.get('ollama', None)
-    if ollama_host and check_ollama_availability(ollama_host):
+    if ollama_host:
         print(f"{Fore.YELLOW}  [*] Initializing Ollama...{Style.RESET_ALL}", end="", flush=True)
+        sys.stdout.flush()  # Extra flush for problematic terminals
         start_time = time.time()
-        ollama_client = ollama.Client(host=ollama_host)
-        init_time = time.time() - start_time
-        init_times.append(("Ollama", init_time))
-        print(f"{Fore.GREEN} [OK]{Style.RESET_ALL}")
+        if check_ollama_availability(ollama_host):
+            ollama_client = ollama.Client(host=ollama_host)
+            init_time = time.time() - start_time
+            init_times.append(("Ollama", init_time))
+            print(f"{Fore.GREEN} [OK]{Style.RESET_ALL}")
+        else:
+            init_time = time.time() - start_time
+            init_times.append(("Ollama", init_time))
+            print(f"{Fore.RED} [FAILED - Server not available]{Style.RESET_ALL}")
 
     # Print initialization times sorted from slowest to fastest
     # if init_times:
