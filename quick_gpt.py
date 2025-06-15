@@ -438,14 +438,21 @@ def run_google(
         print("Thinking\n")
     
     messages = []
+    system_instruction = context  # Default system instruction
 
     # If we have conversation history, use it (Google API is different)
     if conversation_history:
-        # Convert conversation history to Google's format
+        # Extract system instruction and user messages from conversation history
         for msg in conversation_history:
-            if msg["role"] == "user":
+            if msg["role"] == "system":
+                system_instruction = msg["content"]
+            elif msg["role"] == "user":
                 messages.append(msg["content"])
-            # Google's API handles assistant responses differently
+            # Skip assistant messages as Google API handles them differently
+        
+        # Add new user input if provided
+        if input_text and len(input_text) > 0:
+            messages.append(input_text)
     else:
         # Original single-shot behavior
         if input_text and len(input_text) > 0:
@@ -454,18 +461,14 @@ def run_google(
         if input_text2 is not None:
             messages.append(input_text2)
 
-    # If we have conversation history but need to add new user input
-    if conversation_history and input_text:
-        messages.append(input_text)
-
     # Note: Google API streaming support would need to be implemented here
     # For now, we'll use non-streaming mode even when stream=True
-    if context:
+    if system_instruction:
         response = google_client.models.generate_content(
             model=google_model,
             contents=messages,
             config=genai.types.GenerateContentConfig(
-                system_instruction=context,
+                system_instruction=system_instruction,
                 temperature=temperature
             )
         )
@@ -479,6 +482,13 @@ def run_google(
             )
         )
         response_text = response.text
+    
+    # Print the response (this was missing for streaming mode)
+    if not stream:
+        print(response_text)
+    else:
+        # For streaming mode, we should print the response since we're not actually streaming
+        print(response_text)
     
     # Add to conversation history if we're in chat mode (simplified for Google API)
     if conversation_history is not None and input_text:
