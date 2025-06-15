@@ -491,7 +491,7 @@ def get_agent_choice(agents):
         print(f"{Fore.RED}[ERROR] Invalid choice. Please try again.{Style.RESET_ALL}")
 
 
-def display_menu(dir_path, clipboard_text):
+def display_menu(dir_path):
 
     def fix_grammar():
         print(f"{Fore.YELLOW}[*] Fixing grammar...{Style.RESET_ALL}")
@@ -654,6 +654,10 @@ def display_menu(dir_path, clipboard_text):
     }
 
     while True:
+        # Read fresh clipboard content and print it before showing menu
+        clipboard_text = pyperclip.paste()
+        print_clipboard_content(clipboard_text)
+        
         # Display the menu
         # print(f"\n{Fore.MAGENTA}>> Available Actions for {agent_name.title()}:{Style.RESET_ALL}")
         # print(f"{Fore.BLUE}{'=' * 60}{Style.RESET_ALL}")
@@ -743,8 +747,7 @@ def main():
             return
         agent_name = selected_agent
 
-    print_clipboard_content(clipboard_text)
-    display_menu(dir_path, clipboard_text)
+    display_menu(dir_path)
 
     print(f"\n{Fore.GREEN}[DONE] Thank you for using QuickGPT!{Style.RESET_ALL}")
 
