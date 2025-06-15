@@ -50,116 +50,255 @@ agent_name = "chatgpt"
 
 # Note: different agents are using OpenAI API (they were intentionally made compatible)
 def run_openai(
-        client, model: str, context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+        client, model: str, context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None, conversation_history=None, stream=False):
 
-    print("Thinking\n")
+    if not stream:
+        print("Thinking\n")
+    
     messages = []
-    if context and len(context) > 0:
-        messages.append({
-            "role": "system",
-            "content": context
-        })
+    
+    # If we have conversation history, use it
+    if conversation_history:
+        messages = conversation_history.copy()
+    else:
+        # Original single-shot behavior
+        if context and len(context) > 0:
+            messages.append({
+                "role": "system",
+                "content": context
+            })
 
-    if input_text and len(input_text) > 0:
+        if input_text and len(input_text) > 0:
+            messages.append({
+                "role": "user",
+                "content": input_text
+            })
+
+        if input_text2 is not None:
+            messages.append({
+               "role": "user",
+               "content": input_text2
+            })
+
+    # If we have conversation history but need to add new user input
+    if conversation_history and input_text:
         messages.append({
-            "role": "user",
+            "role": "user", 
             "content": input_text
-        })
-
-    if input_text2 is not None:
-        messages.append({
-           "role": "user",
-           "content": input_text2
         })
 
     response = client.chat.completions.create(
       model=model,
       messages=messages,
       temperature=temperature,
-      max_tokens=max_tokens
+      max_tokens=max_tokens,
+      stream=stream
     )
-    return response.choices[0].message.content
+    
+    if stream:
+        # Handle streaming response
+        response_content = ""
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:
+                content = chunk.choices[0].delta.content
+                print(content, end="", flush=True)
+                response_content += content
+        print()  # New line after streaming is complete
+    else:
+        response_content = response.choices[0].message.content
+    
+    # Add assistant response to conversation history if we're in chat mode
+    if conversation_history is not None:
+        messages.append({
+            "role": "assistant",
+            "content": response_content
+        })
+        # Update the conversation history in place
+        conversation_history.clear()
+        conversation_history.extend(messages)
+    
+    return response_content
 
 
 # Note: different agents are using Anthropic API (they were intentionally made compatible)
 def run_anthropic(
-        client, model: str, context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+        client, model: str, context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None, conversation_history=None, stream=False):
 
-    print("Thinking\n")
+    if not stream:
+        print("Thinking\n")
+    
     temperature = min(temperature, 1.0)
     messages = []
-    if context and len(context) > 0:
-        messages.append({
-            "role": "user",
-            "content": context
-        })
+    
+    # If we have conversation history, use it
+    if conversation_history:
+        messages = conversation_history.copy()
+    else:
+        # Original single-shot behavior
+        if context and len(context) > 0:
+            messages.append({
+                "role": "user",
+                "content": context
+            })
 
-    if input_text and len(input_text) > 0:
+        if input_text and len(input_text) > 0:
+            messages.append({
+                "role": "user",
+                "content": input_text
+            })
+
+        if input_text2 is not None:
+            messages.append({
+               "role": "user",
+               "content": input_text2
+            })
+
+    # If we have conversation history but need to add new user input
+    if conversation_history and input_text:
         messages.append({
-            "role": "user",
+            "role": "user", 
             "content": input_text
         })
 
-    if input_text2 is not None:
+    if stream:
+        # Handle streaming response
+        response_content = ""
+        with client.messages.stream(
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            messages=messages
+        ) as stream:
+            for text in stream.text_stream:
+                print(text, end="", flush=True)
+                response_content += text
+        print()  # New line after streaming is complete
+    else:
+        message = client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            messages=messages
+        )
+        response_content = message.content[0].text.strip()
+    
+    # Add assistant response to conversation history if we're in chat mode
+    if conversation_history is not None:
         messages.append({
-           "role": "user",
-           "content": input_text2
+            "role": "assistant",
+            "content": response_content
         })
-
-    message = client.messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        messages=messages
-    )
-    return message.content[0].text.strip()
+        # Update the conversation history in place
+        conversation_history.clear()
+        conversation_history.extend(messages)
+    
+    return response_content
 
 
-def run_ollama(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+def run_ollama(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None, conversation_history=None, stream=False):
     assert (isinstance(ollama_client, ollama.Client))
     max_tokens = min(max_tokens, 32768)
-    print("Thinking\n")
+    
+    if not stream:
+        print("Thinking\n")
 
     messages = []
-    if context and len(context) > 0:
-        messages.append({
-            "role": "user",
-            "content": context
-        })
+    
+    # If we have conversation history, use it
+    if conversation_history:
+        messages = conversation_history.copy()
+    else:
+        # Original single-shot behavior
+        if context and len(context) > 0:
+            messages.append({
+                "role": "user",
+                "content": context
+            })
 
-    if input_text and len(input_text) > 0:
+        if input_text and len(input_text) > 0:
+            messages.append({
+                "role": "user",
+                "content": input_text
+            })
+
+        if input_text2 is not None:
+            messages.append({
+               "role": "user",
+               "content": input_text2
+            })
+
+    # If we have conversation history but need to add new user input
+    if conversation_history and input_text:
         messages.append({
-            "role": "user",
+            "role": "user", 
             "content": input_text
         })
 
-    if input_text2 is not None:
+    if stream:
+        # Handle streaming response for Ollama
+        response_content = ""
+        response = ollama_client.chat(
+            model=ollama_model,
+            messages=messages,
+            stream=True
+        )
+        for chunk in response:
+            if 'message' in chunk and 'content' in chunk['message']:
+                content = chunk['message']['content']
+                print(content, end="", flush=True)
+                response_content += content
+        print()  # New line after streaming is complete
+        cleaned_content = re.sub(r"<think>.*?</think>\n?", "", response_content, flags=re.DOTALL)
+    else:
+        response = ollama_client.chat(
+            model=ollama_model,
+            messages=messages,
+        )
+        res = response['message']['content']
+        cleaned_content = re.sub(r"<think>.*?</think>\n?", "", res, flags=re.DOTALL)
+    
+    # Add assistant response to conversation history if we're in chat mode
+    if conversation_history is not None:
         messages.append({
-           "role": "user",
-           "content": input_text2
+            "role": "assistant",
+            "content": cleaned_content
         })
-
-    response = ollama_client.chat(
-        model=ollama_model,
-        messages=messages,
-    )
-    res = response['message']['content']
-    cleaned_content = re.sub(r"<think>.*?</think>\n?", "", res, flags=re.DOTALL)
+        # Update the conversation history in place
+        conversation_history.clear()
+        conversation_history.extend(messages)
+    
     return cleaned_content
 
 
 def run_google(
-        context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+        context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None, conversation_history=None, stream=False):
 
-    print("Thinking\n")
+    if not stream:
+        print("Thinking\n")
+    
     messages = []
 
-    if input_text and len(input_text) > 0:
+    # If we have conversation history, use it (Google API is different)
+    if conversation_history:
+        # Convert conversation history to Google's format
+        for msg in conversation_history:
+            if msg["role"] == "user":
+                messages.append(msg["content"])
+            # Google's API handles assistant responses differently
+    else:
+        # Original single-shot behavior
+        if input_text and len(input_text) > 0:
+            messages.append(input_text)
+
+        if input_text2 is not None:
+            messages.append(input_text2)
+
+    # If we have conversation history but need to add new user input
+    if conversation_history and input_text:
         messages.append(input_text)
 
-    if input_text2 is not None:
-        messages.append(input_text2)
-
+    # Note: Google API streaming support would need to be implemented here
+    # For now, we'll use non-streaming mode even when stream=True
     if context:
         response = google_client.models.generate_content(
             model=google_model,
@@ -169,7 +308,7 @@ def run_google(
                 temperature=temperature
             )
         )
-        return response.text
+        response_text = response.text
     else:
         response = google_client.models.generate_content(
             model=google_model,
@@ -178,7 +317,20 @@ def run_google(
                 temperature=temperature
             )
         )
-        return response.text
+        response_text = response.text
+    
+    # Add to conversation history if we're in chat mode (simplified for Google API)
+    if conversation_history is not None and input_text:
+        conversation_history.append({
+            "role": "user",
+            "content": input_text
+        })
+        conversation_history.append({
+            "role": "assistant", 
+            "content": response_text
+        })
+    
+    return response_text
 
 
 def load_json(file_path: str):
@@ -207,34 +359,34 @@ def read_file(file_path):
         print(f"An error occurred: {e}")
 
 
-def run_chatgpt(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+def run_chatgpt(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None, conversation_history=None, stream=False):
     assert(isinstance(chatgpt_client, openai.OpenAI))
     max_tokens = min(max_tokens, 16384)
-    return run_openai(chatgpt_client, openai_model, context, input_text, temperature, max_tokens, input_text2)
+    return run_openai(chatgpt_client, openai_model, context, input_text, temperature, max_tokens, input_text2, conversation_history, stream)
 
 
-def run_perplexity(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+def run_perplexity(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None, conversation_history=None, stream=False):
     assert (isinstance(perplexity_client, openai.OpenAI))
     max_tokens = min(max_tokens, 127072)
-    return run_openai(perplexity_client, perplexity_model, context, input_text, temperature, max_tokens, input_text2)
+    return run_openai(perplexity_client, perplexity_model, context, input_text, temperature, max_tokens, input_text2, conversation_history, stream)
 
 
-def run_deepseek(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+def run_deepseek(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None, conversation_history=None, stream=False):
     assert (isinstance(deepseek_client, openai.OpenAI))
     max_tokens = min(max_tokens, 8192)
-    return run_openai(deepseek_client, deepseek_model, context, input_text, temperature, max_tokens, input_text2)
+    return run_openai(deepseek_client, deepseek_model, context, input_text, temperature, max_tokens, input_text2, conversation_history, stream)
 
 
-def run_claude(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+def run_claude(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None, conversation_history=None, stream=False):
     assert (isinstance(claude_client, anthropic.Anthropic))
     max_tokens = min(max_tokens, 8192)
-    return run_anthropic(claude_client, anthropic_model, context, input_text, temperature, max_tokens, input_text2)
+    return run_anthropic(claude_client, anthropic_model, context, input_text, temperature, max_tokens, input_text2, conversation_history, stream)
 
 
-def run_grok(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None):
+def run_grok(context: str, input_text: str, temperature: float, max_tokens: int, input_text2=None, conversation_history=None, stream=False):
     assert (isinstance(grok_client, anthropic.Anthropic))
     max_tokens = min(max_tokens, 131072)
-    return run_anthropic(grok_client, xai_model, context, input_text, temperature, max_tokens, input_text2)
+    return run_anthropic(grok_client, xai_model, context, input_text, temperature, max_tokens, input_text2, conversation_history, stream)
 
 
 # function routing table
@@ -269,6 +421,115 @@ def ask_expert(prompt, expert_file):
     else:
         print(f"Unsupported agent name: {agent_name}")
         return prompt
+
+
+def chat_with_expert(expert_file, expert_name):
+    """
+    Start a chat session with a specific expert
+    """
+    temperature = 0.7
+    max_tokens = 131072
+    task_context = read_file(os.path.join("experts", expert_file))
+    
+    if not task_context:
+        print(f"{Fore.RED}[ERROR] Could not load expert context from {expert_file}{Style.RESET_ALL}")
+        return
+    
+    # Initialize conversation history with system context
+    conversation_history = []
+    if task_context and len(task_context) > 0:
+        conversation_history.append({
+            "role": "system",
+            "content": task_context
+        })
+    
+    last_response = None  # Track last response for copying
+    
+    print(f"\n{Back.BLUE}{Fore.WHITE}{'=' * 60}{Style.RESET_ALL}")
+    print(f"{Back.BLUE}{Fore.WHITE}                Chat with {expert_name} Expert                {Style.RESET_ALL}")
+    print(f"{Back.BLUE}{Fore.WHITE}{'=' * 60}{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}>> You are now chatting with the {expert_name} expert.{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}>> Type 'exit', 'quit', or 'back' to return to the main menu.{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}>> Type 'clear' to clear the conversation history.{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}>> Type 'copy' to copy the last response to clipboard.{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}>> Responses will stream in real-time for better interactivity.{Style.RESET_ALL}")
+    print(f"{Fore.BLUE}{'-' * 60}{Style.RESET_ALL}")
+    
+    while True:
+        # Get user input
+        user_input = input(f"\n{Fore.YELLOW}[You]: {Style.RESET_ALL}").strip()
+        
+        # Check for exit commands
+        if user_input.lower() in ['exit', 'quit', 'back']:
+            print(f"{Fore.CYAN}[INFO] Ending chat with {expert_name} expert.{Style.RESET_ALL}")
+            break
+        
+        # Check for clear command
+        if user_input.lower() == 'clear':
+            # Reset conversation history with just the system context
+            conversation_history = []
+            if task_context and len(task_context) > 0:
+                conversation_history.append({
+                    "role": "system",
+                    "content": task_context
+                })
+            last_response = None
+            print(f"{Fore.GREEN}[INFO] Conversation history cleared.{Style.RESET_ALL}")
+            continue
+        
+        # Check for copy command
+        if user_input.lower() == 'copy':
+            if last_response:
+                pyperclip.copy(last_response)
+                print(f"{Fore.GREEN}[INFO] Last response copied to clipboard!{Style.RESET_ALL}")
+            else:
+                print(f"{Fore.YELLOW}[INFO] No response to copy yet.{Style.RESET_ALL}")
+            continue
+        
+        # Skip empty inputs
+        if not user_input:
+            continue
+        
+        try:
+            # Get response from the expert using streaming
+            print(f"\n{Fore.MAGENTA}[{expert_name} Expert]: {Style.RESET_ALL}", end="", flush=True)
+            
+            if agent_name in agent_functions:
+                # Check if the agent function supports streaming
+                import inspect
+                sig = inspect.signature(agent_functions[agent_name])
+                supports_streaming = 'stream' in sig.parameters
+                
+                if supports_streaming:
+                    response = agent_functions[agent_name](
+                        None,  # context is now in conversation_history
+                        user_input, 
+                        temperature, 
+                        max_tokens, 
+                        None,  # input_text2
+                        conversation_history,
+                        stream=True  # Enable streaming
+                    )
+                else:
+                    # Fallback for agents that don't support streaming yet
+                    response = agent_functions[agent_name](
+                        None,  # context is now in conversation_history
+                        user_input, 
+                        temperature, 
+                        max_tokens, 
+                        None,  # input_text2
+                        conversation_history
+                    )
+                    print(f"{response}")
+                
+                last_response = response  # Store for potential copying
+            else:
+                print(f"{Fore.RED}[ERROR] Unsupported agent name: {agent_name}{Style.RESET_ALL}")
+                break
+                
+        except Exception as e:
+            print(f"{Fore.RED}[ERROR] Failed to get response from {expert_name} expert: {e}{Style.RESET_ALL}")
+            continue
 
 
 def get_git_diff(working_dir):
@@ -601,36 +862,16 @@ def display_menu(dir_path):
         print(f"{Fore.CYAN}[OK] Copied to clipboard!{Style.RESET_ALL}")
 
     def ask_rendering_expert():
-        print(f"{Fore.YELLOW}[*] Consulting rendering expert...{Style.RESET_ALL}")
-        answer = ask_expert(clipboard_text, "rendering.txt")
-        print(f"\n{Fore.GREEN}[RESULT]{Style.RESET_ALL}")
-        print(answer)
-        pyperclip.copy(answer)
-        print(f"{Fore.CYAN}[OK] Copied to clipboard!{Style.RESET_ALL}")
+        chat_with_expert("rendering.txt", "Rendering")
 
     def ask_cpp_expert():
-        print(f"{Fore.YELLOW}[*] Consulting C++ expert...{Style.RESET_ALL}")
-        answer = ask_expert(clipboard_text, "cpp.txt")
-        print(f"\n{Fore.GREEN}[RESULT]{Style.RESET_ALL}")
-        print(answer)
-        pyperclip.copy(answer)
-        print(f"{Fore.CYAN}[OK] Copied to clipboard!{Style.RESET_ALL}")
+        chat_with_expert("cpp.txt", "C++")
 
     def ask_manager_expert():
-        print(f"{Fore.YELLOW}[*] Consulting management expert...{Style.RESET_ALL}")
-        answer = ask_expert(clipboard_text, "manager.txt")
-        print(f"\n{Fore.GREEN}[RESULT]{Style.RESET_ALL}")
-        print(answer)
-        pyperclip.copy(answer)
-        print(f"{Fore.CYAN}[OK] Copied to clipboard!{Style.RESET_ALL}")
+        chat_with_expert("manager.txt", "Management")
 
     def ask_entrepreneur_expert():
-        print(f"{Fore.YELLOW}[*] Consulting entrepreneur expert...{Style.RESET_ALL}")
-        answer = ask_expert(clipboard_text, "entrepreneur.txt")
-        print(f"\n{Fore.GREEN}[RESULT]{Style.RESET_ALL}")
-        print(answer)
-        pyperclip.copy(answer)
-        print(f"{Fore.CYAN}[OK] Copied to clipboard!{Style.RESET_ALL}")
+        chat_with_expert("entrepreneur.txt", "Entrepreneur")
 
     # Build a dictionary of menu items: "key": (label, handler_function)
     menu_items = {
@@ -646,10 +887,10 @@ def display_menu(dir_path):
         "10": ("Structure (braindump)", structure_braindump),
         "11": ("Raw prompt", raw_prompt),
         "12": ("Custom prompt...", custom_raw_prompt),
-        "13": ("Ask rendering expert", ask_rendering_expert),
-        "14": ("Ask C++ expert", ask_cpp_expert),
-        "15": ("Ask management expert", ask_manager_expert),
-        "16": ("Ask entrepreneur expert", ask_entrepreneur_expert),
+        "13": ("Chat with rendering expert", ask_rendering_expert),
+        "14": ("Chat with C++ expert", ask_cpp_expert),
+        "15": ("Chat with management expert", ask_manager_expert),
+        "16": ("Chat with entrepreneur expert", ask_entrepreneur_expert),
         "0": ("Exit", None)
     }
 
@@ -680,7 +921,7 @@ def display_menu(dir_path):
         print_menu_group("GIT OPERATIONS", git_actions)
         print_menu_group("CONTENT TOOLS", content_actions)
         print_menu_group("CUSTOM PROMPTS", prompt_actions)
-        print_menu_group("EXPERT CONSULTATION", expert_actions)
+        print_menu_group("EXPERT CHAT", expert_actions)
         
         print(f"\n{Fore.RED}   0. Exit{Style.RESET_ALL}")
         print(f"{Fore.BLUE}{'=' * 60}{Style.RESET_ALL}")
@@ -697,11 +938,14 @@ def display_menu(dir_path):
                 print(f"\n{Fore.CYAN}[RUN] Executing: {label}{Style.RESET_ALL}")
                 action()  # Execute the corresponding function
                 
-                # Ask if user wants to continue
-                print(f"\n{Fore.BLUE}{'-' * 50}{Style.RESET_ALL}")
-                continue_choice = input(f"{Fore.CYAN}>> Continue? (y/n): {Style.RESET_ALL}").strip().lower()
-                if continue_choice not in ['y', 'yes', '']:
-                    break
+                # Expert chat functions handle their own interaction loops
+                # so we don't need to ask "Continue?" for them
+                if choice not in ["13", "14", "15", "16"]:
+                    # Ask if user wants to continue for non-chat functions
+                    print(f"\n{Fore.BLUE}{'-' * 50}{Style.RESET_ALL}")
+                    continue_choice = input(f"{Fore.CYAN}>> Continue? (y/n): {Style.RESET_ALL}").strip().lower()
+                    if continue_choice not in ['y', 'yes', '']:
+                        break
             else:
                 print(f"{Fore.RED}[ERROR] No action defined for this option.{Style.RESET_ALL}")
         else:
