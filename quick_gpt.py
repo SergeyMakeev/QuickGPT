@@ -98,24 +98,47 @@ def run_openai(
     if stream:
         # Handle streaming response
         response_content = ""
-        for chunk in response:
-            if chunk.choices[0].delta.content is not None:
-                content = chunk.choices[0].delta.content
-                print(content, end="", flush=True)
-                response_content += content
-        print()  # New line after streaming is complete
+        try:
+            for chunk in response:
+                if chunk.choices and len(chunk.choices) > 0 and chunk.choices[0].delta.content is not None:
+                    content = chunk.choices[0].delta.content
+                    print(content, end="", flush=True)
+                    response_content += content
+            print()  # New line after streaming is complete
+        except Exception as e:
+            print(f"\n[ERROR] Streaming failed: {e}")
+            response_content = "Error: Streaming failed"
     else:
-        response_content = response.choices[0].message.content
+        if response.choices and len(response.choices) > 0:
+            response_content = response.choices[0].message.content
+        else:
+            response_content = "Error: No response content received"
     
     # Add assistant response to conversation history if we're in chat mode
     if conversation_history is not None:
-        messages.append({
+        # Rebuild conversation history with the new assistant response
+        new_history = []
+        
+        # Add system message first if we have one
+        if context and len(context) > 0:
+            new_history.append({
+                "role": "system",
+                "content": context
+            })
+        
+        # Add all messages that were sent to the API
+        for msg in messages:
+            new_history.append(msg)
+        
+        # Add the assistant response
+        new_history.append({
             "role": "assistant",
             "content": response_content
         })
-        # Update the conversation history in place
+        
+        # Replace the conversation history
         conversation_history.clear()
-        conversation_history.extend(messages)
+        conversation_history.extend(new_history)
     
     return response_content
 
@@ -129,17 +152,20 @@ def run_anthropic(
     
     temperature = min(temperature, 1.0)
     messages = []
+    system_message = None
     
     # If we have conversation history, use it
     if conversation_history:
-        messages = conversation_history.copy()
+        # Extract system message and regular messages separately for Anthropic
+        for msg in conversation_history:
+            if msg["role"] == "system":
+                system_message = msg["content"]
+            elif msg["role"] in ["user", "assistant"]:
+                messages.append(msg)
     else:
         # Original single-shot behavior
         if context and len(context) > 0:
-            messages.append({
-                "role": "user",
-                "content": context
-            })
+            system_message = context
 
         if input_text and len(input_text) > 0:
             messages.append({
@@ -160,37 +186,154 @@ def run_anthropic(
             "content": input_text
         })
 
+    # Filter out any empty or invalid messages
+    valid_messages = []
+    for msg in messages:
+        if (msg.get("role") in ["user", "assistant"] and 
+            msg.get("content") and 
+            isinstance(msg.get("content"), str) and 
+            msg.get("content").strip()):
+            valid_messages.append(msg)
+    
+    if not valid_messages:
+        return "Error: No valid messages to send to API"
+    
+    messages = valid_messages
+    
+    # Ensure first message is from user (Anthropic requirement)
+    if messages[0]["role"] != "user":
+        return "Error: First message must be from user for Anthropic API"
+
+    # Prepare the API call parameters
+    api_params = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "messages": messages
+    }
+    
+    # Add system message if we have one
+    if system_message:
+        api_params["system"] = system_message
+    
+    # Important: Don't add stream=True to api_params here since we handle it separately
+
     if stream:
-        # Handle streaming response
-        response_content = ""
-        with client.messages.stream(
-            model=model,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            messages=messages
-        ) as stream:
-            for text in stream.text_stream:
-                print(text, end="", flush=True)
-                response_content += text
-        print()  # New line after streaming is complete
+        # Implement proper Anthropic streaming with defensive programming
+        try:
+            response_content = ""
+            # Use the streaming API with proper error handling
+            stream_response = client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                messages=messages,
+                system=system_message if system_message else None,
+                stream=True
+            )
+            
+            for chunk in stream_response:
+                # Handle different types of streaming chunks safely
+                if hasattr(chunk, 'type'):
+                    if chunk.type == 'content_block_delta':
+                        if hasattr(chunk, 'delta') and hasattr(chunk.delta, 'text') and chunk.delta.text:
+                            text = chunk.delta.text
+                            print(text, end="", flush=True)
+                            response_content += text
+                    elif chunk.type == 'content_block_start':
+                        if hasattr(chunk, 'content_block') and hasattr(chunk.content_block, 'text'):
+                            text = chunk.content_block.text
+                            print(text, end="", flush=True)
+                            response_content += text
+            print()  # New line after streaming is complete
+            
+        except Exception as e:
+            print(f"\n[ERROR] Streaming failed: {e}")
+            # Try basic non-streaming as fallback, but with small max_tokens to avoid timeout
+            try:
+                fallback_response = client.messages.create(
+                    model=model,
+                    max_tokens=min(max_tokens, 4096),  # Reduce to avoid timeout
+                    temperature=temperature,
+                    messages=messages,
+                    system=system_message if system_message else None
+                )
+                if fallback_response.content and len(fallback_response.content) > 0:
+                    response_content = fallback_response.content[0].text
+                    print(response_content)
+                else:
+                    response_content = "Error: No response content received"
+            except Exception as e2:
+                print(f"[ERROR] Fallback also failed: {e2}")
+                response_content = f"Error: Both streaming and fallback failed: {e}"
     else:
-        message = client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            messages=messages
-        )
-        response_content = message.content[0].text.strip()
+        # For non-streaming mode, try basic create first, fall back to streaming if needed
+        try:
+            message = client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                messages=messages,
+                system=system_message if system_message else None
+            )
+            if message.content and len(message.content) > 0:
+                response_content = message.content[0].text
+                print(response_content)
+            else:
+                response_content = "Error: No response content received"
+        except Exception as e:
+            # If non-streaming fails (likely due to long operation requirement), use streaming
+            print(f"[INFO] Non-streaming failed ({e}), switching to streaming...")
+            try:
+                response_content = ""
+                stream_response = client.messages.create(
+                    model=model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    messages=messages,
+                    system=system_message if system_message else None,
+                    stream=True
+                )
+                
+                for chunk in stream_response:
+                    if hasattr(chunk, 'type'):
+                        if chunk.type == 'content_block_delta':
+                            if hasattr(chunk, 'delta') and hasattr(chunk.delta, 'text') and chunk.delta.text:
+                                response_content += chunk.delta.text
+                        elif chunk.type == 'content_block_start':
+                            if hasattr(chunk, 'content_block') and hasattr(chunk.content_block, 'text'):
+                                response_content += chunk.content_block.text
+                
+                print(response_content)  # Print full response for non-streaming mode
+            except Exception as e2:
+                print(f"[ERROR] Streaming fallback failed: {e2}")
+                response_content = f"Error: All methods failed: {e}"
     
     # Add assistant response to conversation history if we're in chat mode
     if conversation_history is not None:
-        messages.append({
+        # Rebuild conversation history with the new assistant response
+        new_history = []
+        
+        # Add system message first if we have one
+        if system_message:
+            new_history.append({
+                "role": "system",
+                "content": system_message
+            })
+        
+        # Add all messages that were sent to the API
+        for msg in messages:
+            new_history.append(msg)
+        
+        # Add the assistant response
+        new_history.append({
             "role": "assistant",
             "content": response_content
         })
-        # Update the conversation history in place
+        
+        # Replace the conversation history
         conversation_history.clear()
-        conversation_history.extend(messages)
+        conversation_history.extend(new_history)
     
     return response_content
 
@@ -237,25 +380,43 @@ def run_ollama(context: str, input_text: str, temperature: float, max_tokens: in
     if stream:
         # Handle streaming response for Ollama
         response_content = ""
-        response = ollama_client.chat(
-            model=ollama_model,
-            messages=messages,
-            stream=True
-        )
-        for chunk in response:
-            if 'message' in chunk and 'content' in chunk['message']:
-                content = chunk['message']['content']
-                print(content, end="", flush=True)
-                response_content += content
-        print()  # New line after streaming is complete
-        cleaned_content = re.sub(r"<think>.*?</think>\n?", "", response_content, flags=re.DOTALL)
+        try:
+            response = ollama_client.chat(
+                model=ollama_model,
+                messages=messages,
+                stream=True
+            )
+            for chunk in response:
+                if 'message' in chunk and 'content' in chunk['message'] and chunk['message']['content'] is not None:
+                    content = chunk['message']['content']
+                    print(content, end="", flush=True)
+                    response_content += content
+            print()  # New line after streaming is complete
+            cleaned_content = re.sub(r"<think>.*?</think>\n?", "", response_content, flags=re.DOTALL)
+        except Exception as e:
+            print(f"\n[ERROR] Ollama streaming failed: {e}")
+            # Fallback to non-streaming
+            try:
+                response = ollama_client.chat(
+                    model=ollama_model,
+                    messages=messages,
+                )
+                res = response['message']['content']
+                cleaned_content = re.sub(r"<think>.*?</think>\n?", "", res, flags=re.DOTALL)
+            except Exception as e2:
+                print(f"[ERROR] Ollama fallback failed: {e2}")
+                cleaned_content = "Error: Failed to get response from Ollama"
     else:
-        response = ollama_client.chat(
-            model=ollama_model,
-            messages=messages,
-        )
-        res = response['message']['content']
-        cleaned_content = re.sub(r"<think>.*?</think>\n?", "", res, flags=re.DOTALL)
+        try:
+            response = ollama_client.chat(
+                model=ollama_model,
+                messages=messages,
+            )
+            res = response['message']['content']
+            cleaned_content = re.sub(r"<think>.*?</think>\n?", "", res, flags=re.DOTALL)
+        except Exception as e:
+            print(f"[ERROR] Ollama request failed: {e}")
+            cleaned_content = "Error: Failed to get response from Ollama"
     
     # Add assistant response to conversation history if we're in chat mode
     if conversation_history is not None:
