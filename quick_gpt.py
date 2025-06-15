@@ -97,21 +97,51 @@ def run_openai(
     )
     
     if stream:
-        # Handle streaming response
+        # Handle streaming response with thinking tag support
         response_content = ""
+        inside_think = False
         try:
             for chunk in response:
                 if chunk.choices and len(chunk.choices) > 0 and chunk.choices[0].delta.content is not None:
                     content = chunk.choices[0].delta.content
-                    print(content, end="", flush=True)
                     response_content += content
+                    
+                    # Handle thinking tags for reasoning models (like DeepSeek R1)
+                    i = 0
+                    while i < len(content):
+                        char = content[i]
+                        
+                        # Check if we're starting a think tag
+                        if content[i:].startswith('<think>') and not inside_think:
+                            inside_think = True
+                            print(f"{Fore.LIGHTBLACK_EX}<think>", end="", flush=True)
+                            i += 7
+                            continue
+                        
+                        # Check if we're ending a think tag
+                        if content[i:].startswith('</think>') and inside_think:
+                            inside_think = False
+                            print(f"</think>{Style.RESET_ALL}", end="", flush=True)
+                            i += 8
+                            continue
+                        
+                        # Print character with appropriate color
+                        if inside_think:
+                            print(f"{Fore.LIGHTBLACK_EX}{char}", end="", flush=True)
+                        else:
+                            print(f"{Style.RESET_ALL}{char}", end="", flush=True)
+                        i += 1
             print()  # New line after streaming is complete
+            # Clean up thinking tags from the final response content
+            response_content = re.sub(r"<think>.*?</think>\n?", "", response_content, flags=re.DOTALL)
         except Exception as e:
             print(f"\n[ERROR] Streaming failed: {e}")
             response_content = "Error: Streaming failed"
     else:
         if response.choices and len(response.choices) > 0:
             response_content = response.choices[0].message.content
+            # Clean up thinking tags from non-streaming response as well
+            response_content = re.sub(r"<think>.*?</think>\n?", "", response_content, flags=re.DOTALL)
         else:
             response_content = "Error: No response content received"
     
@@ -220,9 +250,10 @@ def run_anthropic(
     # Important: Don't add stream=True to api_params here since we handle it separately
 
     if stream:
-        # Implement proper Anthropic streaming with defensive programming
+        # Implement proper Anthropic streaming with defensive programming and thinking tag support
         try:
             response_content = ""
+            inside_think = False
             # Use the streaming API with proper error handling
             stream_response = client.messages.create(
                 model=model,
@@ -236,17 +267,45 @@ def run_anthropic(
             for chunk in stream_response:
                 # Handle different types of streaming chunks safely
                 if hasattr(chunk, 'type'):
+                    text = None
                     if chunk.type == 'content_block_delta':
                         if hasattr(chunk, 'delta') and hasattr(chunk.delta, 'text') and chunk.delta.text:
                             text = chunk.delta.text
-                            print(text, end="", flush=True)
-                            response_content += text
                     elif chunk.type == 'content_block_start':
                         if hasattr(chunk, 'content_block') and hasattr(chunk.content_block, 'text'):
                             text = chunk.content_block.text
-                            print(text, end="", flush=True)
-                            response_content += text
+                    
+                    if text:
+                        response_content += text
+                        
+                        # Handle thinking tags
+                        i = 0
+                        while i < len(text):
+                            char = text[i]
+                            
+                            # Check if we're starting a think tag
+                            if text[i:].startswith('<think>') and not inside_think:
+                                inside_think = True
+                                print(f"{Fore.LIGHTBLACK_EX}<think>", end="", flush=True)
+                                i += 7
+                                continue
+                            
+                            # Check if we're ending a think tag
+                            if text[i:].startswith('</think>') and inside_think:
+                                inside_think = False
+                                print(f"</think>{Style.RESET_ALL}", end="", flush=True)
+                                i += 8
+                                continue
+                            
+                            # Print character with appropriate color
+                            if inside_think:
+                                print(f"{Fore.LIGHTBLACK_EX}{char}", end="", flush=True)
+                            else:
+                                print(f"{Style.RESET_ALL}{char}", end="", flush=True)
+                            i += 1
             print()  # New line after streaming is complete
+            # Clean up thinking tags from the final response content
+            response_content = re.sub(r"<think>.*?</think>\n?", "", response_content, flags=re.DOTALL)
             
         except Exception as e:
             print(f"\n[ERROR] Streaming failed: {e}")
@@ -261,6 +320,8 @@ def run_anthropic(
                 )
                 if fallback_response.content and len(fallback_response.content) > 0:
                     response_content = fallback_response.content[0].text
+                    # Clean up thinking tags
+                    response_content = re.sub(r"<think>.*?</think>\n?", "", response_content, flags=re.DOTALL)
                     print(response_content)
                 else:
                     response_content = "Error: No response content received"
@@ -279,6 +340,8 @@ def run_anthropic(
             )
             if message.content and len(message.content) > 0:
                 response_content = message.content[0].text
+                # Clean up thinking tags
+                response_content = re.sub(r"<think>.*?</think>\n?", "", response_content, flags=re.DOTALL)
                 print(response_content)
             else:
                 response_content = "Error: No response content received"
@@ -305,6 +368,8 @@ def run_anthropic(
                             if hasattr(chunk, 'content_block') and hasattr(chunk.content_block, 'text'):
                                 response_content += chunk.content_block.text
                 
+                # Clean up thinking tags
+                response_content = re.sub(r"<think>.*?</think>\n?", "", response_content, flags=re.DOTALL)
                 print(response_content)  # Print full response for non-streaming mode
             except Exception as e2:
                 print(f"[ERROR] Streaming fallback failed: {e2}")
@@ -379,8 +444,10 @@ def run_ollama(context: str, input_text: str, temperature: float, max_tokens: in
         })
 
     if stream:
-        # Handle streaming response for Ollama
+        # Handle streaming response for Ollama with colored thinking
         response_content = ""
+        inside_think = False
+        
         try:
             response = ollama_client.chat(
                 model=ollama_model,
@@ -390,8 +457,34 @@ def run_ollama(context: str, input_text: str, temperature: float, max_tokens: in
             for chunk in response:
                 if 'message' in chunk and 'content' in chunk['message'] and chunk['message']['content'] is not None:
                     content = chunk['message']['content']
-                    print(content, end="", flush=True)
                     response_content += content
+                    
+                    # Simple approach: process content and apply coloring based on current state
+                    i = 0
+                    while i < len(content):
+                        char = content[i]
+                        
+                        # Check if we're starting a think tag
+                        if content[i:].startswith('<think>') and not inside_think:
+                            inside_think = True
+                            print(f"{Fore.LIGHTBLACK_EX}<think>", end="", flush=True)
+                            i += 7
+                            continue
+                        
+                        # Check if we're ending a think tag
+                        if content[i:].startswith('</think>') and inside_think:
+                            inside_think = False
+                            print(f"</think>{Style.RESET_ALL}", end="", flush=True)
+                            i += 8
+                            continue
+                        
+                        # Print character with appropriate color
+                        if inside_think:
+                            print(f"{Fore.LIGHTBLACK_EX}{char}", end="", flush=True)
+                        else:
+                            print(f"{Style.RESET_ALL}{char}", end="", flush=True)
+                        i += 1
+            
             print()  # New line after streaming is complete
             cleaned_content = re.sub(r"<think>.*?</think>\n?", "", response_content, flags=re.DOTALL)
         except Exception as e:
