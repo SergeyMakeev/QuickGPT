@@ -6,6 +6,7 @@ for key in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy']:
 
 import sys
 import json
+import argparse
 import openai
 import anthropic
 import pyperclip
@@ -885,6 +886,164 @@ def initialize():
     #     print(f"{Fore.BLUE}{'=' * 52}{Style.RESET_ALL}")
 
 
+def list_all_models():
+    """List all available models from all configured ML vendors"""
+    print(f"\n{Back.BLUE}{Fore.WHITE}{'=' * 60}{Style.RESET_ALL}")
+    print(f"{Back.BLUE}{Fore.WHITE}              Available Models from All Vendors             {Style.RESET_ALL}")
+    print(f"{Back.BLUE}{Fore.WHITE}{'=' * 60}{Style.RESET_ALL}")
+    
+    api_keys = load_json("api_keys.json")
+    if not api_keys:
+        print(f"{Fore.RED}[ERROR] Could not load api_keys.json{Style.RESET_ALL}")
+        return
+    
+    # OpenAI/ChatGPT models
+    openai_api_key = api_keys.get('openai', None)
+    if openai_api_key:
+        print(f"\n{Fore.CYAN}>> OpenAI/ChatGPT Models:{Style.RESET_ALL}")
+        print(f"{Fore.BLUE}{'-' * 40}{Style.RESET_ALL}")
+        try:
+            client = openai.OpenAI(api_key=openai_api_key)
+            models = client.models.list()
+            openai_models = [model.id for model in models.data if model.id.startswith(('gpt-', 'o1-', 'chatgpt-'))]
+            openai_models.sort()
+            for model in openai_models:
+                print(f"{Fore.WHITE}  • {model}{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.RED}  [ERROR] Failed to fetch OpenAI models: {e}{Style.RESET_ALL}")
+    
+    # Anthropic/Claude models
+    anthropic_api_key = api_keys.get('anthropic', None)
+    if anthropic_api_key:
+        print(f"\n{Fore.CYAN}>> Anthropic/Claude Models:{Style.RESET_ALL}")
+        print(f"{Fore.BLUE}{'-' * 40}{Style.RESET_ALL}")
+        try:
+            client = anthropic.Anthropic(api_key=anthropic_api_key)
+            models = client.models.list()
+            claude_models = [model.id for model in models.data if 'claude' in model.id.lower()]
+            claude_models.sort()
+            for model in claude_models:
+                print(f"{Fore.WHITE}  • {model}{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.RED}  [ERROR] Failed to fetch Anthropic models: {e}{Style.RESET_ALL}")
+    
+    # XAI/Grok models
+    xai_api_key = api_keys.get('xai', None)
+    if xai_api_key:
+        print(f"\n{Fore.CYAN}>> XAI/Grok Models:{Style.RESET_ALL}")
+        print(f"{Fore.BLUE}{'-' * 40}{Style.RESET_ALL}")
+        try:
+            client = anthropic.Anthropic(api_key=xai_api_key, base_url="https://api.x.ai")
+            models = client.models.list()
+            grok_models = [model.id for model in models.data]
+            grok_models.sort()
+            for model in grok_models:
+                print(f"{Fore.WHITE}  • {model}{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.RED}  [ERROR] Failed to fetch XAI models: {e}{Style.RESET_ALL}")
+    
+    # Perplexity models
+    perplexity_api_key = api_keys.get('perplexity', None)
+    if perplexity_api_key:
+        print(f"\n{Fore.CYAN}>> Perplexity Models:{Style.RESET_ALL}")
+        print(f"{Fore.BLUE}{'-' * 40}{Style.RESET_ALL}")
+        try:
+            # Perplexity doesn't seem to support model listing via API
+            # Let's show commonly available models based on their documentation
+            perplexity_models = [
+                "llama-3.1-sonar-small-128k-online",
+                "llama-3.1-sonar-large-128k-online", 
+                "llama-3.1-sonar-huge-128k-online",
+                "llama-3.1-sonar-small-128k-chat",
+                "llama-3.1-sonar-large-128k-chat",
+                "llama-3.1-70b-instruct",
+                "llama-3.1-8b-instruct",
+                "r1-1776"
+            ]
+            for model in perplexity_models:
+                print(f"{Fore.WHITE}  • {model}{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}  [INFO] Perplexity doesn't support model listing via API. Showing common models.{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.RED}  [ERROR] Failed to fetch Perplexity models: {e}{Style.RESET_ALL}")
+    
+    # DeepSeek models
+    deepseek_api_key = api_keys.get('deepseek', None)
+    if deepseek_api_key:
+        print(f"\n{Fore.CYAN}>> DeepSeek Models:{Style.RESET_ALL}")
+        print(f"{Fore.BLUE}{'-' * 40}{Style.RESET_ALL}")
+        try:
+            client = openai.OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
+            models = client.models.list()
+            deepseek_models = [model.id for model in models.data]
+            deepseek_models.sort()
+            for model in deepseek_models:
+                print(f"{Fore.WHITE}  • {model}{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.RED}  [ERROR] Failed to fetch DeepSeek models: {e}{Style.RESET_ALL}")
+    
+    # Google/Gemini models
+    google_api_key = api_keys.get('google', None)
+    if google_api_key:
+        print(f"\n{Fore.CYAN}>> Google/Gemini Models:{Style.RESET_ALL}")
+        print(f"{Fore.BLUE}{'-' * 40}{Style.RESET_ALL}")
+        try:
+            client = genai.Client(api_key=google_api_key)
+            models_pager = client.models.list()
+            google_models = []
+            # Iterate through the pager to get all models
+            for model in models_pager:
+                if 'gemini' in model.name.lower():
+                    google_models.append(model.name)
+            google_models.sort()
+            for model in google_models:
+                print(f"{Fore.WHITE}  • {model}{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.RED}  [ERROR] Failed to fetch Google models: {e}{Style.RESET_ALL}")
+    
+    # Ollama models (local)
+    ollama_host = api_keys.get('ollama', None)
+    if ollama_host:
+        print(f"\n{Fore.CYAN}>> Ollama Models (Local):{Style.RESET_ALL}")
+        print(f"{Fore.BLUE}{'-' * 40}{Style.RESET_ALL}")
+        try:
+            if check_ollama_availability(ollama_host):
+                client = ollama.Client(host=ollama_host)
+                models_response = client.list()
+                ollama_models = []
+                
+                # Debug: Print response structure (can be removed later)
+                # print(f"DEBUG: Ollama response type: {type(models_response)}")
+                # print(f"DEBUG: Ollama response: {models_response}")
+                
+                # Handle different possible response structures
+                if isinstance(models_response, dict):
+                    if 'models' in models_response:
+                        for model in models_response['models']:
+                            if isinstance(model, dict):
+                                # Try different possible keys for model name
+                                model_name = model.get('name') or model.get('model') or model.get('id') or str(model)
+                                ollama_models.append(model_name)
+                            else:
+                                ollama_models.append(str(model))
+                    else:
+                        # If no 'models' key, try to use the response directly
+                        ollama_models = [str(models_response)]
+                else:
+                    # If response is not a dict, convert to string
+                    ollama_models = [str(models_response)]
+                
+                ollama_models.sort()
+                for model in ollama_models:
+                    print(f"{Fore.WHITE}  • {model}{Style.RESET_ALL}")
+            else:
+                print(f"{Fore.RED}  [ERROR] Ollama server not available at {ollama_host}{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.RED}  [ERROR] Failed to fetch Ollama models: {e}{Style.RESET_ALL}")
+    
+    print(f"\n{Fore.BLUE}{'=' * 60}{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}[INFO] Model listing complete!{Style.RESET_ALL}")
+
+
 def print_header():
     """Print a nice header for the application"""
     print(f"\n{Back.BLUE}{Fore.WHITE}{'=' * 60}{Style.RESET_ALL}")
@@ -1138,6 +1297,18 @@ def display_menu(dir_path):
 def main():
     global agent_name
 
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='QuickGPT Assistant - AI-powered text processing tool')
+    parser.add_argument('--list-models', action='store_true', 
+                        help='List all available models from all configured ML vendors and exit')
+    
+    args = parser.parse_args()
+    
+    # If list-models flag is provided, list models and exit
+    if args.list_models:
+        list_all_models()
+        return
+
     print_header()
     initialize()
 
@@ -1179,4 +1350,5 @@ def main():
     print(f"\n{Fore.GREEN}[DONE] Thank you for using QuickGPT!{Style.RESET_ALL}")
 
 
-main()
+if __name__ == "__main__":
+    main()
