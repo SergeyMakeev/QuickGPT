@@ -22,7 +22,7 @@ from google import genai
 init(autoreset=True)
 
 chatgpt_client = None
-openai_model = "gpt-4.5-preview"
+openai_model = "gpt-4o"
 
 claude_client = None
 anthropic_model = "claude-opus-4-20250514"
